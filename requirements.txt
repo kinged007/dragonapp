@@ -1,0 +1,69 @@
+# Core
+fastapi==0.109.2
+loguru==0.7.2
+pydantic==2.5.3
+pydantic[email]
+pydantic-settings
+PyJWT==2.8.0
+python-dotenv==1.0.0
+# rich==13.7.0 # Used for debugging only. 
+requests_html==0.10.0
+uvicorn
+croniter==2.0.1
+# Database 
+# beanie==1.24.0
+# motor==3.3.2
+# Database 2 (Optional) - Favouring PyMongo!
+pymongo==4.6.1
+# tinydb==4.5.1 # provides a local, file based alternative to MongoDB, for smaller projects
+git+https://github.com/schapman1974/tinymongo.git#egg=tinymongo # mongo wrapper for quick dropin replacement for mongodb, uses tinydb
+# Database SQL (optional)
+sqlmodel
+alembic # TODO For migrations
+# URL/HTML Tools
+# beautifulsoup4==4.12.2
+# courlan==0.9.5
+# passlib==1.7.4
+# markdown==3.5.2
+# tiktoken
+# html2text==2020.1.16
+python-bsonjs
+# Logging and Debugging
+# logtail-python==0.2.10 # deprecate. Just use sentry
+sentry-sdk[fastapi]
+sentry-sdk[loguru]
+sentry-sdk[pymongo]
+# Cache
+pympler # Used to calculate memory usage
+# Task Manager
+rq
+rq-scheduler
+
+
+# beanie
+# courlan
+# fastapi
+# loguru
+# # mangum
+# motor
+# passlib
+# # pydantic[email,dotenv]==2.3.0
+# pydantic
+# # pydantic_settings
+# PyJWT
+# Requests
+# # soundfile==0.12.1
+# # spacy
+# # telethon
+# # tiktoken
+# trafilatura
+# uvicorn
+# openai
+# bcrypt
+# langchain
+# bs4
+# requests-html==v0.10.0
+# # markdown
+# rich
+# # gpt_researcher
+# python-dotenv
