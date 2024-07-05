@@ -98,15 +98,19 @@ class DragonTinyMongoClient(TinyMongoClient):
         # register other custom serializers
         return serialization        
         # return JsonSafeStorage
+        
     def get(self, name):
         return DragonTinyMongoDatabase(name, self._foldername, self._storage)
+    
     def __getitem__(self, key):
         """Gets a new or existing database based in key"""
-        return DragonTinyMongoDatabase(key, self._foldername, self._storage)
+        # return DragonTinyMongoDatabase(key, self._foldername, self._storage)
+        return self.get(key)
 
     def __getattr__(self, name):
         """Gets a new or existing database based in attribute"""
-        return DragonTinyMongoDatabase(name, self._foldername, self._storage)
+        # return DragonTinyMongoDatabase(name, self._foldername, self._storage)
+        return self.get(name)
 
 
 
