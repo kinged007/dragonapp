@@ -14,16 +14,17 @@ async def update_migration_job(job_json:dict) -> None:
     if not job_json:
         raise Exception("No job data found")    
     
-    job = MigrationJob(**job_json)
-    # Set up DB client
-    db_client = Database.get_collection('ms_entra_migration_job')
-    
-    # Update
     try:
+        
+        job = MigrationJob(**job_json)
+        # Set up DB client
+        db_client = Database.get_collection('ms_entra_migration_job')
+        
+        # Update
         # res = db_client.update_one({'_id': ObjectId(id) }, {"$set": {"apps": data, "status": Status.PENDING_APPROVAL.value }})
-        res = db_client.update_one({'_id': ObjectId(id) }, {"$set": job.model_dump() })
+        res = db_client.update_one({'_id': ObjectId(job.id) }, {"$set": job.model_dump() })
         
         return JSONResponse(content={"message": f"Migration Job updated: {res}"})
         
     except Exception as e:
-        raise Exception from e
+        raise Exception(e)

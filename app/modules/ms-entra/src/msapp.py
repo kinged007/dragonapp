@@ -28,7 +28,8 @@ def connect_tenant(tenant_data: dict):
     
     except Exception as e:
         log.error(f"Failed to get tenant: {e}")
-        return None
+        raise Exception(e)
+        # return None
 
 def tenant_request(endpoint, method="GET", data=None, headers=None, params=None, api_key=None, host = None):
     req = server_request(endpoint, method=method, data=data, headers=headers, params=params, api_key=api_key, host=host)

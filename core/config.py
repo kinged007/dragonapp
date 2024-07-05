@@ -84,19 +84,24 @@ class Settings(BaseSettings):
     MONGODB_URI: str | None = "tinydb" # Fallback to TinyDb
     DATABASE_NAME: str | None = None
     
-    @model_validator(mode="after")
-    def _set_default_database_name(self) -> Self:
-        if not self.MONGODB_URI:
-            self.MONGODB_URI = "tinydb" # Fallback to TinyDb
-        if not self.DATABASE_NAME:
-            self.DATABASE_NAME = self.ENVIRONMENT + "_db"
-        return self
 
     REDIS_HOST: str | None = None
     REDIS_PORT: str | None = None
     REDIS_PASSWORD: str| None = None
     RQ_BYPASS_WORKER: str| None = None
     
+    FASTAPI_WORKERS: int = 1
+    
+    @model_validator(mode="after")
+    def _set_default_database_name(self) -> Self:
+        if not self.MONGODB_URI or self.MONGODB_URI == "tinydb":
+            self.MONGODB_URI = "tinydb" # Fallback to TinyDb
+            if self.FASTAPI_WORKERS > 1:
+                warnings.warn("TinyDB does not support multiple workers. Set FASTAPI_WORKERS to 1", stacklevel=1)
+        if not self.DATABASE_NAME:
+            self.DATABASE_NAME = self.ENVIRONMENT + "_db"
+        return self
+
     # POSTGRES_SERVER: str| None = None
     # POSTGRES_PORT: int = 5432
     # POSTGRES_USER: str| None = None

@@ -766,12 +766,23 @@ class FormBuilder:
             # Fetches items from DB if search is provided, or first 1000
             # TODO Add a rate limit!
             nonlocal display_fields
+            
             _data = {}
             if key not in self._database_ref_items:
                 self._database_ref_items[key] = {}
             print(f"self._database_ref_items.{key}....", self._database_ref_items[key])
             if self._database_ref_items[key]:
-                return self._database_ref_items[key]
+                if not display_fields:
+                    _f = ["{"+k+"}" for k in self._database_ref_items[key][0].keys() if isinstance(self._database_ref_items[key][0], dict) and k not in ['_id','id','created_on','updated_on','created_by','updated_by']]
+                    if _f: display_fields = " - ".join(_f[:2])
+                if not display_fields:
+                    raise Exception("No display fields found for database reference.")
+                for d in self._database_ref_items[key].values():
+                    if not d.get('_id'): continue
+                    _display = display_fields.format(**{k: str(v) if v else "" for k, v in d.items() })
+                    _data.update({d.get('_id'): _display})
+                if _data:
+                    return _data
             # TODO add cacheing and update list when searching.
             
             db = Database.get_collection(property.get('collection_name', None))
@@ -787,7 +798,6 @@ class FormBuilder:
                         if _f: display_fields = " - ".join(_f[:2])
                     if not display_fields:
                         raise Exception("No display fields found for database reference.")
-                    
                     for d in db_items:
                         if not d.get('_id'): continue
                         _display = display_fields.format(**{k: str(v) if v else "" for k, v in d.items() })
@@ -802,6 +812,7 @@ class FormBuilder:
             with ui.row().classes("full-width"):
                 
                 db_items = _database_ref_fetch()
+                print("#"*30, db_items)
                 
                 _search = ui.select(
                     # options = {

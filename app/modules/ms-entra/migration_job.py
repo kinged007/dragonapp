@@ -4,6 +4,7 @@
 # Then we skip the need to import the router and get_theme() in each module. Nor do we need the Theme.frame() wrapper.
 # Theme is accessible and can use: "with AdminPanel.theme.content()" for example. 
 from typing import Dict
+import asyncio 
 
 from core.modules.admin_panel import AdminPanel, ui, APIRouter
 from core.utils.database import Database, ObjectId
@@ -12,6 +13,7 @@ from core.common import log, print
 from core.utils.string import to_snake_case
 from core.utils.frontend import ui_helper
 from core.utils.frontend.form_builder import FormBuilder
+from core.utils.datetime import nice_time
 from .src import utils, msapp
 from .schema import Tenant, MigrationJob, Status, SearchTemplates, MigrationOptions
 
@@ -19,8 +21,8 @@ from .src.migration import update_migration_job
 
 router = APIRouter()
 
-@AdminPanel.page('/edit/{id}', title='Migration Job', viewport='full') # kwargs for @router.page
-def migration_job_edit(id:str):
+@AdminPanel.page('/{id}', title='Migration Job', viewport='full') # kwargs for @router.page
+def migration_job_edit(id:str, tab:str = 'edit'):
     
     if not id:
         return ui.label("No ID provided!")
@@ -30,8 +32,11 @@ def migration_job_edit(id:str):
     
     with ui.tabs().classes() as tabs:
         # list = ui.tab('List')
-        one = ui.tab('Apps')
-        two = ui.tab('Execute')
+        edit = ui.tab('Edit')
+        approve = ui.tab('Approve')
+        execute = ui.tab('Execute')
+    
+    selected_tab = locals()[tab] if tab and tab in locals() else edit
     
     # Set up DB client
     db_client = Database.get_collection('ms_entra_migration_job')
@@ -45,9 +50,12 @@ def migration_job_edit(id:str):
     # fallback  # TODO Should be a dict, not a list!!
     if isinstance(migration_job.source_tenant, list):
         log.error("Source Tenant is a list! Should be a dict")
-        migration_job.source_tenant = migration_job.source_tenant[0]
+        # migration_job.source_tenant = migration_job.source_tenant[0]
+        source_tenant = migration_job.source_tenant[0]
+    else:
+        source_tenant = migration_job.source_tenant
 
-    source_tenant = migration_job.source_tenant.name
+    # source_tenant = migration_job.source_tenant.name
     
     
     list_of_apps = []
@@ -60,12 +68,12 @@ def migration_job_edit(id:str):
             ui.notification("Migration Job DB Item could not be found!", type='negative')
             return 
         
-        if not migration_job.source_tenant:
+        if not source_tenant:
             ui.notification("Source Tenant not found!", type='negative')
             return
                 
         # Prepare tenant object
-        tenant = msapp.connect_tenant(migration_job.source_tenant.model_dump())
+        tenant = msapp.connect_tenant(source_tenant.model_dump())
         
         if not tenant or not tenant.access_token:
             ui.notification("Failed to connect to the source tenant!", type='negative')
@@ -218,11 +226,15 @@ def migration_job_edit(id:str):
             try:
                 await update_migration_job(migration_job.model_dump())
                 ui.notify("Migration Job Updated!", type='positive')
-                print("SAVE MIGRATION JOB", data)
+                print("SAVE MIGRATION JOB GOOD", migration_job)
                 dialog.close()
+                
+                ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=approve")
+                
             except Exception as e:
+                log.error(e)
                 ui.notify(f"Failed to update Migration Job: {e}", type='negative')
-                print("SAVE MIGRATION JOB", data)
+                print("SAVE MIGRATION JOB FAIL", migration_job)
                 dialog.close()
                 
             # # res = db_client.update_one({'_id': ObjectId(id) }, {"$set": {"apps": data, "status": Status.PENDING_APPROVAL.value }})
@@ -239,28 +251,58 @@ def migration_job_edit(id:str):
         
         with ui.dialog() as dialog, ui.card():
             ui.label('Are you sure you want to migrate these apps?')
-            if migration_job.status != Status.PENDING:
-                ui_helper.alert_warning("This JOB Status can only be modified if the status is PENDING.")
+            if migration_job.status == Status.APPROVED or migration_job.status == Status.COMPLETED:
+                ui_helper.alert_warning(f"This JOB can not be modified. Current Status: {migration_job.status}")
                 
             with ui.row():
-                if migration_job.status == Status.PENDING:
+                if migration_job.status != Status.APPROVED and migration_job.status != Status.COMPLETED:
                     ui.button('Confirm',icon="check", on_click=_update_migration_job ).props('positive').classes('bg-positive text-white')
                 ui.button('Cancel', on_click=dialog.close).props("primary")
         
         dialog.open()
         
+    async def _approve_job() -> None:
         
-                            
+        async def _approve_migration_job() -> None:
+            migration_job.status = Status.APPROVED
+            # TODO add approved_by parameters
+            # migration_job.approved_by = get_user()
+            # migration_job.approved_at = datetime.now()
+            
+            try:
+                await update_migration_job(migration_job.model_dump())
+                ui.notify("Migration Job Approved!", type='positive')
+                await asyncio.sleep(1)
+                dialog2.close()
+                ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=execute")
+            except Exception as e:
+                log.error(e)
+                ui.notify(f"Failed to approve Migration Job: {e}", type='negative')
+                await asyncio.sleep(3)
+                dialog2.close()
+            
+        with ui.dialog() as dialog2, ui.card():
+            ui.label('Are you sure you want to Approve this Job?')
+            if migration_job.status != Status.PENDING_APPROVAL:
+                ui_helper.alert_warning("Job can only be Approved if the status is PENDING_APPROVAL.")
+                
+            with ui.row():
+                if migration_job.status == Status.PENDING_APPROVAL:
+                    ui.button('Confirm',icon="check", on_click=_approve_migration_job ).props('positive').classes('bg-positive text-white')
+                ui.button('Cancel', on_click=dialog2.close).props("primary")
+        
+        dialog2.open()
+              
     # Display the page
     # def display_page():
-    with ui.tab_panels(tabs, value=one).props('q-pa-none').classes('full-width').style("background: none;"):
+    with ui.tab_panels(tabs, value=selected_tab).props('q-pa-none').classes('full-width').style("background: none;"):
         
         
-        with ui.tab_panel(one).props('q-pa-none'):
+        with ui.tab_panel(edit).props('q-pa-none'):
             # with AdminPanel.theme().content("Apps Search"):
         
-            if migration_job.status != Status.PENDING:
-                ui_helper.alert_warning("This JOB Status can only be modified if the status is PENDING.")
+            if migration_job.status == Status.APPROVED or migration_job.status == Status.COMPLETED:
+                ui_helper.alert_warning(f"This JOB can not be modified. Current Status: {migration_job.status}")
             
             with ui.column():
             
@@ -270,30 +312,30 @@ def migration_job_edit(id:str):
 
                         app_type = migration_job.apps_type
                                                 
-                        ui.label(f"Searching '{app_type}' from Tenant '{source_tenant}'").classes('font-bold text-lg')
+                        ui.label(f"Searching '{app_type}' from Tenant '{source_tenant.name}'").classes('font-bold text-lg')
                         
                         # Fetch search templates
                         fetch_search_templates(app_type)
                         
                         # ## DEBUG TEST
                         # Database Ref box
-                        _dbref_options = list(Database.get_collection('ms_entra_tenants').find({}))
-                        print(_dbref_options)
-                        ui.label("Database Ref Test").classes('font-bold text-lg')
-                        @ui.refreshable
-                        def _test_ref():
-                            with ui.row().classes('full-width') as row:
-                                _search = ui.select(
-                                    options = [s.get('name') for s in _dbref_options], # Use display_field template
-                                    label = "DB REF",
-                                    multiple=True, # If LIST
-                                    with_input = True, #	whether to allow new values
-                                    on_change=lambda: ui.notification([v for v in _dbref_options if v.get('name') == _search.value]),
-                                    # new_value_mode="add",
-                                    clearable=True, # If Optional
-                                ).classes('col-12').props('use-chips')
-                                ui.button("Go", on_click=lambda: ui.notify([v for v in _dbref_options if v.get('name') == _search.value])).classes('bg-positive text-white')
-                        _test_ref()
+                        # _dbref_options = list(Database.get_collection('ms_entra_tenants').find({}))
+                        # print(_dbref_options)
+                        # ui.label("Database Ref Test").classes('font-bold text-lg')
+                        # @ui.refreshable
+                        # def _test_ref():
+                        #     with ui.row().classes('full-width') as row:
+                        #         _search = ui.select(
+                        #             options = [s.get('name') for s in _dbref_options], # Use display_field template
+                        #             label = "DB REF",
+                        #             multiple=True, # If LIST
+                        #             with_input = True, #	whether to allow new values
+                        #             on_change=lambda: ui.notification([v for v in _dbref_options if v.get('name') == _search.value]),
+                        #             # new_value_mode="add",
+                        #             clearable=True, # If Optional
+                        #         ).classes('col-12').props('use-chips')
+                        #         ui.button("Go", on_click=lambda: ui.notify([v for v in _dbref_options if v.get('name') == _search.value])).classes('bg-positive text-white')
+                        # _test_ref()
                         ## DEBUG END
                         
                         
@@ -387,6 +429,9 @@ def migration_job_edit(id:str):
                         # _data = [l for l in list_of_apps if l.get('id') in _ids]
                         _json_editor_results = ui.json_editor({'content': {'json': table_of_results.selected}})
                         
+                        # TEMP
+                        ui_helper.alert_info("If apps are not showing in JSON editor, go back then forward to refresh the data.")
+                        
                         with ui.stepper_navigation():
 
                             ui.button('Submit Apps', on_click= stepper.next ).classes("bg-positive text-white")
@@ -417,15 +462,120 @@ def migration_job_edit(id:str):
                 
 
                 
-        with ui.tab_panel(two).props('q-pa-none'):
-            with AdminPanel.theme().content("Second tab"):
-                ui.label('Second tab')
+        with ui.tab_panel(approve).props('q-pa-none'):
+            with AdminPanel.theme().content("Migration Approval"):
                 
-                # columns=[
-                #     {"name": "id", "label": "ID", "field": "id", "sortable": True, "align": "left", "classes": "hidden", "headerClass": "hidden"},
-                #     {"name": "name", "label": "Name", "field": "name", "sortable": True, "align": "left", "classes": "", "headerClass": ""},
-                #     {"name": "publisher", "label": "Publisher", "field": "publisher", "sortable": True, "align": "left", "classes": "hidden", "headerClass": "hidden"},
-                # ]
+                
+
+                ui.label("Migration Summary").classes('font-bold text-lg')
+                ui.separator()
+                ui.label(f"Migration Job: {migration_job.name}")
+                ui.label(f"Status: {migration_job.status}")
+                # 1. Check status is correct
+                if migration_job.status != Status.PENDING_APPROVAL:
+                    ui_helper.alert_error(f"Migration Job is not in PENDING_APPROVAL status. Current status: {migration_job.status}")
+                ui.label(f"Source Tenant: {source_tenant.name}")
+                ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job.destination_tenants])}")
+                ui.label("Migration Options")
+                ui.json_editor({'content':{'json': migration_job.migration_options.model_dump()}})
+                ui.separator()
+                ui.label(f"Apps to Migrate: {len(migration_job.apps)}")
+                ui.label(f"Apps Type: {migration_job.apps_type}")
+                ui.label("Apps")
+                ui.json_editor({'content':{'json': migration_job.apps}})
+                ui.separator() 
+                
+                if migration_job.status == Status.PENDING_APPROVAL:
+                    ui.button("Approve Migration Job", on_click=_approve_job).classes("bg-positive text-white")
+                
+        
+        with ui.tab_panel(execute).props('q-pa-none'):
+            with AdminPanel.theme().content("Migration Execution"):
+                
+                # Migration callback
+                async def _process_migration():
+                    n = ui.notification(timeout=None)
+                    try:
+                        n.spinner = True
+                        output_log.push(f"{nice_time()} | Executing Migration...")
+                        await asyncio.sleep(1)
+                        
+                        async for result in msapp.process_migration_job(migration_job_execution):
+                            output_log.push(f"{nice_time()} | {result}.")
+                        
+                        n.message = "Migration Job Executed"
+                        n.icon = 'check'
+                        n.spinner = False
+                        n.type = 'positive'
+                        await asyncio.sleep(1)
+                        n.dismiss()
+                        execute_button.disable()
+                        # ui.notify("Migration Job Executed", type='positive')
+                        
+                    except Exception as e:
+                        output_log.push(f"{nice_time()} | Error: {e}")
+                        n.dismiss()
+                        ui.notify(f"Error: {e}", type='negative')                
+                
+                # Re-fetch the migration job
+                
+                # get the migration_job
+                migration_job_execution = db_client.find_one({'_id': ObjectId(migration_job.id)})
+                migration_job_execution = MigrationJob(**migration_job_execution)
+                _ready = True
+                
+                # Process
+                # 1. Check status is correct
+                if migration_job_execution.status != Status.APPROVED:
+                    ui_helper.alert_error(f"Migration Job is not in APPROVED status. Current status: {migration_job_execution.status}")
+                    _ready = False
+                
+                # 2. Check source_tenant exists and destination tenants exist
+                if not migration_job_execution.source_tenant:
+                    ui_helper.alert_error(f"Source Tenant not set.")
+                    _ready = False
                     
-    # display_page()
-    
+                if not migration_job_execution.destination_tenants:
+                    ui_helper.alert_error(f"Destination Tenants not set.")
+                    _ready = False
+                
+                # 3. Check apps to migrate
+                if not migration_job_execution.apps:
+                    ui_helper.alert_error(f"No Apps to migrate.")
+                    _ready = False
+
+                if _ready:
+                    
+                    # fallback  # TODO Should be a dict, not a list!!
+                    if isinstance(migration_job_execution.source_tenant, list):
+                        log.error("Source Tenant is a list! Should be a dict")
+                        migration_job_execution.source_tenant = migration_job.source_tenant[0]
+                    
+                    ui.label("Migration Summary").classes('font-bold text-lg')
+                    ui.separator()
+                    ui.label(f"Migration Job: {migration_job_execution.name}")
+                    ui.label(f"Status: {migration_job_execution.status}")
+                    ui.label(f"Approved by: TODO")
+                    ui.label(f"Approved on: TODO")
+                    ui.separator()
+                    ui.label(f"Source Tenant: {migration_job_execution.name}")
+                    ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job_execution.destination_tenants])}")
+                    ui.label("Migration Options")
+                    ui.json_editor({'content':{'json': migration_job_execution.migration_options.model_dump()}})
+                    ui.separator()
+                    ui.label(f"Apps to Migrate: {len(migration_job_execution.apps)}")
+                    ui.label(f"Apps Type: {migration_job_execution.apps_type}")
+                    ui.separator() 
+                    
+                    with ui.row():
+                        execute_button = ui.button("Execute Migration", on_click=_process_migration ).classes("bg-positive text-white")
+                        ui.button("Execute Post-Processing Migration" )
+                        ui.button("View Report" )
+                    
+                    ui.label("Migration Progress")
+                    ui.separator()
+                    output_log = ui.log().classes('w-full h-100')                
+                
+
+                
+                
