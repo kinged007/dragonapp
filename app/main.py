@@ -13,9 +13,9 @@ settings.APP_VERSION = "0.0.7" # not being used yet. Causes circular dependency 
 Module.load_core(['admin_panel']) # ,'frontend','ai','messaging','locale'])
 
 # Register modules with the app, so it will import it.
-Module.load(['ms-entra'])
+# Module.load(['ms-entra'])
 # Module.load(['bookshelf','ms-entra','pollygene'])
-# Module.load(['my_module','entra-migrate','shlink','bookshelf'])
+Module.load(['my_module','ms-entra','shlink','bookshelf'])
 # Module.load()
 # Modules.load('something_else') 
 
@@ -23,16 +23,12 @@ Module.load(['ms-entra'])
 
 # In essence, Now the app has been loaded. It will now start the server and listen for requests.
 # If any custom code is required to be run before the server starts, it can be added here.
-# All custom code should be placed inside a module endpoint or cron handler. Any utilities or models will be inside the module itself.
+# All custom code should be placed inside a module endpoint or cron handler or as event hooks. Any utilities or models will be inside the module itself.
 
 
 # Examples:
 # - An API only webserver without AdminPanel will have all the code inside the module endpoints. CRUD operations, data processing, etc. 
-# - An AdminPanel only webserver. If using a seperate backend, the baseurl must be defined so the panel may connect to the backend and make requests. The admin token and super admin login credentials should be identical as the backend. The Users module authorizes other users/api keys to access the admin panel.
 # - A webserver with both API and AdminPanel. The AdminPanel will not make HTTP requests to the backend, instead it will interact with the database directly based on the module configurations.
 # - Using teh AdminPanel as a customer App. Designed for more administrative type of apps (Like Directus). May be used for CMS, CRM, etc. The AdminPanel will have a user management system, roles, permissions, etc. The API will be used to interact with the frontend app. Modules may be used to extend the functionality of the AdminPanel.
 
 # AdminPanel utilizes NiceGUI to create the frontend. The frontend is a SPA that interacts with the backend. 
-
-
-# from .modules import my_module

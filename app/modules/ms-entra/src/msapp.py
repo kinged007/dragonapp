@@ -1,4 +1,3 @@
-from loguru import logger as log
 
 import msal
 import asyncio
@@ -6,6 +5,8 @@ import asyncio
 from .utils import server_request
 import time, datetime
 from dateutil.parser import parse
+from core.utils.database import Database, ObjectId
+from core.common import log, print
 
 from ..schema import Tenant, MigrationJob, Status, AppsType
 from ..models.applications import ApplicationModel
@@ -299,7 +300,266 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
     
     return list_of_items
     
+
+
+def save_job(job: MigrationJob):
     
+    db = Database.get_collection(MigrationJob.Settings.name)
+    db.update_one({"_id": ObjectId(job.id)}, {"$set": job.model_dump(exclude=["source_tenant", "destination_tenants", "apps","name","search_params","apps_type"])})
+
+
+
+async def post_process_migration_job(job: MigrationJob):
+    """
+    Post processing of migration job.
+    """
+    # console.rule("Post Processing Migration Job", style="bold magenta")
+    # For completed jobs, create credentials
+    if job.apps_type == AppsType.applications:
+        pass
+        # print(job.apps)
+        # # Cannot add more than 1 password(s) for create application. Skip passwordCredentials and keyCredentials and add them later.
+        # if hasattr(old_app, 'passwordCredentials'): delattr(old_app, 'passwordCredentials')
+        # if hasattr(old_app, 'keyCredentials'): delattr(old_app, 'keyCredentials')
+        # # identifierUris with api://<appId> should refer to its new appId.
+        # if hasattr(old_app, 'identifierUris'): old_app.identifierUris = [x for x in old_app.identifierUris if not x.startswith("api://")]
+    tenants = []
+    
+    for dest in job.destination_tenants:
+        
+        try:
+            
+            _dest_tenant:Tenant = connect_tenant(dest.model_dump())
+                        
+            if not _dest_tenant.access_token:
+                raise 
+            
+            tenants.append(_dest_tenant)
+            
+        except Exception as e:
+            raise Exception(f"Failed to connect to destination tenant: {dest.name}")
+    
+    for dest_tenant in tenants:
+        
+        # type declaration
+        dest_tenant: Tenant
+
+        today = datetime.datetime.now(tz=datetime.timezone.utc)  #+ datetime.timedelta(days=1) # UTC time
+
+        for i in range(len(job.apps)):
+            try:
+                # console.print(apps[i])
+                if job.apps_type == AppsType.applications:
+                    old_app = ApplicationModel(**job.apps[i])
+                if job.apps_type == AppsType.servicePrincipals:
+                    old_app = ServicePrincipalModel(**job.apps[i])
+                # console.print(old_app.post_model())
+                
+            except Exception as e: 
+                yield f"❌ Failed to parse app data for {job.apps[i].get('displayName','?')}: {e}"
+                continue
+            
+        
+            # Check if app is already migrated.
+            if not job.app_id_mapping.get(old_app.appId, {}).get(dest_tenant.client_id):
+                yield f"❌ App '{old_app.displayName}' NOT migrated to {dest.name}"
+                continue
+            
+            if job.migration_options.new_app_suffix:
+                old_app.displayName += " " + job.migration_options.new_app_suffix
+                
+            yield f"Post processing app '{old_app.displayName}' on {dest.name}"
+
+            endpoint = dest_tenant.endpoint.replace("/v1.0","").strip('/') + "/v1.0/"
+            endpoint += str(job.apps_type.value)
+            
+            new_app = job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data']
+            
+            # execute creation
+            try:
+                
+                if not old_app.appId:
+                    raise Exception(f"App '{old_app.displayName}' does not have an appId.")
+                
+                if not new_app:
+                    raise Exception(f"App '{old_app.displayName}' does not have a new app Id.")
+                
+                ####### passwordCredentials
+                
+                try:
+                    if hasattr(old_app, 'passwordCredentials'): 
+                        # Create new passwordCredentials
+                        if old_app.passwordCredentials:
+                            _passwords = [x for x in old_app.passwordCredentials if not x.endDateTime or parse(x.endDateTime) > today]
+                            # if not _passwords and job.migration_options.generate_new_password_if_all_expired:
+                            #     # Generate new password
+                            #     _passwords = old_app.passwordCredentials[0] if old_app.passwordCredentials else []
+                            for password in _passwords:
+                                # Create password
+                                _display_name = password.displayName if password.displayName else "New Migration Password"
+                                # Check if password exists or created already
+                                if any([x for x in new_app.get('passwordCredentials',[]) if x.get('displayName') == _display_name]):
+                                    yield f"Password '{_display_name}' already exists..."
+                                    continue
+                                # Create new password
+                                req = server_request(
+                                    endpoint + f"/{new_app['id']}/addPassword", 
+                                    method="POST", 
+                                    data={
+                                        "passwordCredential": {
+                                            "displayName": _display_name,
+                                        }
+                                    }, 
+                                    api_key=dest_tenant.access_token, 
+                                    # host=dest_config.endpoint
+                                )
+                                if req and req.status_code == 200:
+                                    yield f"✅ Password created successfully: {_display_name}"
+                                    if 'passwordCredentials' not in new_app:
+                                        new_app['passwordCredentials'] = []
+                                    new_app['passwordCredentials'].append(req.json())
+                                else:
+                                    yield f"❌ Failed to create password: {_display_name}: " + str(req.text)
+                except Exception as e:
+                    log.error(f"Failed to create passwordCredentials: {e}")
+                    raise Exception(f"Failed to create passwordCredentials: {e}")
+                
+                ####### keyCredentials
+                
+                # if hasattr(old_app, 'keyCredentials'): # TODO post process keyCredentials
+                
+                ####### identifierUris
+                
+                try:
+                    # identifierUris with api://<appId> should refer to its new appId.
+                    if hasattr(old_app, 'identifierUris'): 
+                        # TODO Fetch existing identifierUris to ensure no URI is overwritten by accident!
+                        _existing_uris = []
+                        _existing_uris_req = server_request(
+                            endpoint + f"/{new_app['id']}", 
+                            method="GET", 
+                            params={
+                                "$select": "identifierUris"
+                            },
+                            api_key=dest_tenant.access_token, 
+                        )
+                        if _existing_uris_req and _existing_uris_req.status_code == 200:
+                            _existing_uris = _existing_uris_req.json()
+                            _existing_uris = _existing_uris.get('identifierUris', [])
+                        else:
+                            yield f"Failed to get existing identifierUris: " + str(_existing_uris_req.text)
+                            # TODO COntinue??
+                            
+                        identifierUris = [x for x in old_app.identifierUris ] # All URI's
+                        _update_uris = []
+                        
+                        for uri in identifierUris:
+                            # Get format: https://learn.microsoft.com/en-us/entra/identity-platform/security-best-practices-for-app-registration#application-id-uri 
+                            # # TODO May received tenant related URI's. May need to replace with new app/tenant ids.    
+                            _new_uri = None
+                            if uri == "api://" + old_app.appId:
+                                _new_uri = "api://" + new_app['appId'] 
+                            
+                            if _new_uri and _new_uri not in _existing_uris: #if _new_uri not in new_app.get('identifierUris', []):
+                                _update_uris.append(_new_uri)
+                        
+                        if _update_uris:
+                            req = server_request(
+                                endpoint + f"/{new_app['id']}", 
+                                method="PATCH", 
+                                data={
+                                    "identifierUris": _update_uris # includes existing URIs to avoid overwriting existing ones.
+                                }, 
+                                api_key=dest_tenant.access_token, 
+                            )
+                            if req and req.status_code == 204:
+                                yield f"✅ identifierUris updated successfully"
+                                if 'identifierUris' not in new_app:
+                                    new_app['identifierUris'] = []
+                                new_app['identifierUris'] = _update_uris
+                            else:
+                                yield f"❌ Failed to update identifierUris: " + str(req.text)
+                except Exception as e:
+                    log.error(f"Failed to update identifierUris: {e}")
+                    raise Exception(f"Failed to update identifierUris: {e}")
+                
+                #### servicePrincipal: servicePrincipalNames
+                
+                try: 
+                    if hasattr(old_app, 'servicePrincipalNames'): 
+                        # Recreate servicePrincipalNames after creation.
+                        print("OLD APP", type(old_app), old_app)
+                        print("NEW APP", type(new_app), new_app)
+                        
+                        _existing_uris = []
+                        _existing_uris_req = server_request(
+                            endpoint + f"/{new_app['id']}", 
+                            method="GET", 
+                            params={
+                                "$select": "servicePrincipalNames"
+                            },
+                            api_key=dest_tenant.access_token, 
+                        )
+                        if _existing_uris_req and _existing_uris_req.status_code == 200:
+                            _existing_uris = _existing_uris_req.json()
+                            _existing_uris = _existing_uris.get('servicePrincipalNames', [])
+                        else:
+                            yield f"Failed to get existing servicePrincipalNames: " + str(_existing_uris_req.text)
+                            # TODO COntinue??
+                            
+                        servicePrincipalNames = [x for x in old_app.servicePrincipalNames ] # All URI's
+                        _update_uris = []
+                        
+                        for uri in servicePrincipalNames:
+                            # Get format: https://learn.microsoft.com/en-us/entra/identity-platform/security-best-practices-for-app-registration#application-id-uri 
+                            # # TODO May received tenant related URI's. May need to replace with new app/tenant ids.    
+                            _new_uri = None
+                            if uri == "api://" + old_app.appId:
+                                _new_uri = "api://" + new_app['appId'] 
+                            
+                            if _new_uri and _new_uri not in _existing_uris: #if _new_uri not in new_app.get('servicePrincipalNames', []):
+                                _update_uris.append(_new_uri)
+                        
+                        print(_update_uris)
+                        
+                        if _update_uris:
+                            req = server_request(
+                                endpoint + f"/{new_app['id']}", 
+                                method="PATCH", 
+                                data={
+                                    "servicePrincipalNames": _update_uris # includes existing URIs to avoid overwriting existing ones.
+                                }, 
+                                api_key=dest_tenant.access_token, 
+                            )
+                            if req and req.status_code == 204:
+                                yield f"✅ servicePrincipalNames updated successfully"
+                                if 'servicePrincipalNames' not in new_app:
+                                    new_app['servicePrincipalNames'] = []
+                                new_app['servicePrincipalNames'] = _update_uris
+                            else:
+                                yield f"❌ Failed to update servicePrincipalNames: " + str(req.text)
+                except Exception as e:
+                    log.error(f"Failed to update servicePrincipalNames: {e}")
+                    raise Exception(f"Failed to update servicePrincipalNames: {e}")
+                
+                # Update app_id_mapping
+                job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data'] = new_app
+
+            except Exception as e:
+                    # Store failed attempt in migration job
+                    # Check if req has been defined
+                    yield f"❌ Failed to post process app '{old_app.displayName}' on '{dest.name}':\n {e}"
+            
+            yield "Post Processing Complete"
+            
+            # Save updated migration job
+            # save_job(job) # DEBUG
+            
+            await asyncio.sleep(1)
+
+                
+                
+                
 async def process_migration_job(job: MigrationJob):
     """
     Processes the migration job by migrating apps to destination tenants.
@@ -351,6 +611,7 @@ async def process_migration_job(job: MigrationJob):
         - to refer to the app by the appId, use /applications(appId='{appId}')
         - Values of identifierUris hostnames must be a verified domain on the tenant. Create list of filters templates to skip certain app typs (eg. VPN, etc.)
         - API Permissions are not granted by default, need to look for a way to grant permissions.
+        - ISSUE: Property displayName on the service principal does not match the application object
     """
     yield f"Processing Migration Job: {job.name}"
     
@@ -408,6 +669,7 @@ async def process_migration_job(job: MigrationJob):
                         _data = ApplicationModel(**apps[i])
                     if job.apps_type == AppsType.servicePrincipals:
                         _data = ServicePrincipalModel(**apps[i])
+                    
                     # console.print(_data.post_model())
                     
                 except Exception as e: 
@@ -440,7 +702,10 @@ async def process_migration_job(job: MigrationJob):
                         # SEE Notes above
                         delattr(_data, 'identifierUris')
                         # _data.identifierUris = [x for x in _data.identifierUris if not x.startswith("api://")]
-
+                if job.apps_type == AppsType.servicePrincipals:
+                    # Drop specific key:values
+                    # add them afterwards
+                    if hasattr(_data, 'servicePrincipalNames'): delattr(_data, 'servicePrincipalNames') # recreate servicePrincipalNames after creation.
                     
                         
                 
@@ -453,13 +718,25 @@ async def process_migration_job(job: MigrationJob):
                     if job.migration_options.new_app_suffix:
                         _data.displayName += " " + job.migration_options.new_app_suffix
                     
-                    req = server_request(
-                        endpoint, 
-                        method="POST", 
-                        data=_data.post_model(), 
-                        api_key=dest_tenant.access_token, 
-                        # host=dest_tenant.endpoint
-                    )
+                    if job.migration_options.use_upsert:
+                        
+                        req = server_request(
+                            endpoint + "(appId='{appId}')".format(appId=_data.appId), 
+                            method="PATCH", 
+                            data=_data.post_model(), 
+                            api_key=dest_tenant.access_token, 
+                            # host=dest_tenant.endpoint
+                        )
+                        
+                    else:
+                        
+                        req = server_request(
+                            endpoint, 
+                            method="POST", 
+                            data=_data.post_model(), 
+                            api_key=dest_tenant.access_token, 
+                            # host=dest_tenant.endpoint
+                        )
                     
                     if req and req.status_code == 201:
                         # Check emoji: https://emojicombos.com/
@@ -474,7 +751,12 @@ async def process_migration_job(job: MigrationJob):
                         if _data.appId not in job.app_id_mapping:
                             job.app_id_mapping[_data.appId] = {}
                         job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _new_app_id, "data": req.json() }})
-                            
+                
+                    elif req and req.status_code == 204: # no response code for PATCH
+                        yield f"✅ App '{_data.displayName}' UPDATED successfully in {dest_tenant.name}"
+                        if _data.appId not in job.app_id_mapping:
+                            job.app_id_mapping[_data.appId] = {}
+                        job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _data.appId, "data": _data.model_dump() }})
                     else:
                         raise Exception()
 
@@ -521,8 +803,13 @@ async def process_migration_job(job: MigrationJob):
         job.status = Status.COMPLETED
         # Post Processing
         # console.print("Post Processing...", style="bold green")
+        yield "Post Processing Apps..."
+        async for result in post_process_migration_job(job):
+            yield result    
         # post_process_migration_job(job)
     
     # TODO job.save()
-
+    # save_job(job) # DEBUG
+    print(job)
+    
     # TODO migration_job_report(job)

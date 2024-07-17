@@ -35,7 +35,7 @@ def sidebar_menu(self):
     
     
     # Trigger event hook
-    trigger_event("pre_sidebar_menu", menu=_menu )
+    trigger_event("admin_panel_pre_sidebar_menu", menu=_menu )
     
     for title, url in _menu.items():
         
@@ -48,7 +48,7 @@ def sidebar_menu(self):
         
             
     # Trigger menu event hook
-    trigger_event("post_sidebar_menu")
+    trigger_event("admin_panel_post_sidebar_menu")
     
     # TODO If SuperAdmin. Move Settings to bottom of sidebar into icon
     ui.menu_item("Settings", on_click=lambda: ui.navigate.to(f"/config/module")).classes('full-width text-light')

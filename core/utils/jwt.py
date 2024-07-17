@@ -5,6 +5,7 @@ from utils.datetime import datetime, timedelta
 from core import log
 from enum import Enum
 from utils.datetime import utc_now
+from core.config import settings
 
 class JWTAlgorithm(Enum):
     ES384: str = "ES384"
@@ -27,7 +28,7 @@ class JWT(BaseModel):
     def __init__(self, secret_key=None, algo:JWTAlgorithm =None, default_expire: timedelta = None):
         super().__init__()
         if not secret_key: 
-            self.secret_key = os.environ['SECRET_KEY']
+            self.secret_key = settings.SECRET_KEY
         else: self.secret_key = secret_key
         if algo: self.algo = algo
         if default_expire: self.default_expires = default_expire

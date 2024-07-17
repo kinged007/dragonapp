@@ -225,6 +225,14 @@ class webApplicationResource(BaseModel):
     implicitGrantSettings: Optional[implicitGrantSettingsResource] = None
     logoutUrl: Optional[str] = None
     redirectUris: Optional[list] = None
+
+class addIn(BaseModel):
+    """
+    https://learn.microsoft.com/en-us/graph/api/resources/addin?view=graph-rest-1.0
+    """
+    id: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+    type: Optional[str] = None
     
 # Application Models
 
@@ -236,7 +244,7 @@ class ApplicationModel(BaseModel):
         # 'use_enum_values': True,
     }
     
-    addIns: Optional[list] = []
+    addIns: Optional[List[addIn]] = None
     api: Optional[apiApplicationResource] = None
     appId: Optional[str] = None # read-only
     applicationTemplateId: Optional[str] = None

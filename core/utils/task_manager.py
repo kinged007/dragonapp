@@ -2,6 +2,7 @@
 from typing import Any, Dict, List, Union
 from beanie import init_beanie
 from beanie.odm.documents import Document
+# TODO Remove Beanie support. Instead use PyMOngo extended DragonApp Database handler.
 from datetime import datetime, timezone, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
@@ -117,7 +118,7 @@ class TaskManager:
         try:
             if TaskManager.queue:
                 
-                if is_async:
+                if is_async: # TODO check if method is async or not automatically
                     job = TaskManager.queue.enqueue(TaskManager._async_manager, func, *args, **kwargs)
                     print("Async Job:", job)
                     return job

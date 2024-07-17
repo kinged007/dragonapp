@@ -39,7 +39,7 @@ def migration_job_edit(id:str, tab:str = 'edit'):
     selected_tab = locals()[tab] if tab and tab in locals() else edit
     
     # Set up DB client
-    db_client = Database.get_collection('ms_entra_migration_job')
+    db_client = Database.get_collection(MigrationJob.Settings.name)
     
     # get the migration_job
     migration_job = db_client.find_one({'_id': ObjectId(id)})
@@ -496,12 +496,18 @@ def migration_job_edit(id:str, tab:str = 'edit'):
                 async def _process_migration():
                     n = ui.notification(timeout=None)
                     try:
+                        data = await migration_options.run_editor_method('get')
+                        await asyncio.sleep(0.1)
+                        migration_job_execution.migration_options = MigrationOptions(**data.get('json',{})) 
+                        
                         n.spinner = True
                         output_log.push(f"{nice_time()} | Executing Migration...")
+                        migration_job_execution.log.append(f"{nice_time()} | Executing Migration....")
                         await asyncio.sleep(1)
                         
                         async for result in msapp.process_migration_job(migration_job_execution):
                             output_log.push(f"{nice_time()} | {result}.")
+                            migration_job_execution.log.append(f"{nice_time()} | {result}.")
                         
                         n.message = "Migration Job Executed"
                         n.icon = 'check'
@@ -509,11 +515,15 @@ def migration_job_edit(id:str, tab:str = 'edit'):
                         n.type = 'positive'
                         await asyncio.sleep(1)
                         n.dismiss()
-                        execute_button.disable()
+                        if migration_job_execution.status == Status.COMPLETED:
+                            ui.notify("Migration Job Completed", type='positive')
+                            execute_button.disable()
                         # ui.notify("Migration Job Executed", type='positive')
+                        # Job is saved in  the execution method
                         
                     except Exception as e:
                         output_log.push(f"{nice_time()} | Error: {e}")
+                        migration_job_execution.log.append(f"{nice_time()} | Error: {e}.")
                         n.dismiss()
                         ui.notify(f"Error: {e}", type='negative')                
                 
@@ -561,7 +571,7 @@ def migration_job_edit(id:str, tab:str = 'edit'):
                     ui.label(f"Source Tenant: {migration_job_execution.name}")
                     ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job_execution.destination_tenants])}")
                     ui.label("Migration Options")
-                    ui.json_editor({'content':{'json': migration_job_execution.migration_options.model_dump()}})
+                    migration_options = ui.json_editor({'content':{'json': migration_job_execution.migration_options.model_dump()}})
                     ui.separator()
                     ui.label(f"Apps to Migrate: {len(migration_job_execution.apps)}")
                     ui.label(f"Apps Type: {migration_job_execution.apps_type}")
@@ -572,10 +582,11 @@ def migration_job_edit(id:str, tab:str = 'edit'):
                         ui.button("Execute Post-Processing Migration" )
                         ui.button("View Report" )
                     
-                    ui.label("Migration Progress")
-                    ui.separator()
-                    output_log = ui.log().classes('w-full h-100')                
+                ui.label("Migration Execution Log")
+                ui.separator()
+                output_log = ui.log().classes('w-full h-100')                
                 
-
-                
+                if migration_job_execution.log:
+                    for l in migration_job_execution.log:
+                        output_log.push(l)
                 

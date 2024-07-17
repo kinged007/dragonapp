@@ -55,27 +55,30 @@ class MigrationOptions(BaseModel):
     generate_new_password_if_all_expired: bool = Field(False, description="Generate new password if all are expired")
     generate_new_certificate_if_all_expired: bool = Field(False, description="Generate new certificate if all are expired")
     new_app_suffix: str = Field("", description="The suffix to add to the new app name")
+    use_upsert: bool = Field(False, description="Use upsert to update existing apps or create new one if they don't exist")
     
             
 class MigrationJob(database.DatabaseMongoBaseModel):
     
     
     name: str = Field(..., description="The name of the migration job")
-    apps: List[Dict] = Field([], description="The apps to be migrated", json_schema_extra={"hidden": True}) 
+    status: Status = Field(Status.PENDING, description="The status of the migration job")
+    apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
     
+    apps: List[Dict] = Field([], description="The apps to be migrated", json_schema_extra={"hidden": True}) 
     search_params: Optional[Dict] = Field({}, description="The search parameters for the apps to be migrated", json_schema_extra={"hidden": True})
     
     # file: Optional[str] = None
     source_tenant: Optional[List[Tenant]] = Field(None, description="The source tenant file name")
     # source_client_id: Optional[str] = Field(default=None, description="The source tenant client id")
     destination_tenants: List[Tenant] = Field([], description="The destination tenant file names")
-    status: Status = Field(Status.PENDING, description="The status of the migration job")
-    apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
     migration_options: Optional[MigrationOptions] = Field(MigrationOptions(), description="The migration options")
     
     app_id_mapping: Optional[Dict[str, Dict[str, dict]]] = Field({}, description="The mapping of app ids between source and destination tenants: {source_app_id:  {destination_client_id: destination_app_id}}", json_schema_extra={"hidden": True})
     # apps_migrated: List[str] = Field([], description="The list of apps that have been migrated")
     apps_failed: Optional[Dict[str, Dict[str,dict]]] = Field({}, description="The list of apps that failed to migrate: {destination_client_id: {'app': _data, 'response': req.text, 'status': req.status_code }}", json_schema_extra={"hidden": True})
+    
+    log: Optional[List[str]] = Field([], description="The log of the migration job")
     
     class Settings:
         name = "ms_entra_migration_job"
