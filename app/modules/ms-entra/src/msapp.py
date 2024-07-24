@@ -7,6 +7,7 @@ import time, datetime
 from dateutil.parser import parse
 from core.utils.database import Database, ObjectId
 from core.common import log, print
+from core.utils.dict import dict_walk
 
 from ..schema import Tenant, MigrationJob, Status, AppsType
 from ..models.applications import ApplicationModel
@@ -221,20 +222,20 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
     top = 1
     skip_apps_without_credentials = False
 
-    if query['search']: query['search'] = query['search'] if query['search'].startswith("'") or query['search'].startswith('"') else f'"{query["search"]}"'
-    last_search = query['search']
-    last_filter = query['filter']
-    last_raw_params = query['raw_params']
-    last_skip_publishers = query['skip_publishers'] if 'skip_publishers' in query else []
+    if 'search' in query and query['search']: query['search'] = query['search'] if query['search'].startswith("'") or query['search'].startswith('"') else f'"{query["search"]}"'
+    # last_search = query['search']
+    last_filter = query['filter'] if 'filter' in query else ""
+    # last_raw_params = query['raw_params']
+    # last_skip_publishers = query['skip_publishers'] if 'skip_publishers' in query else []
 
     params = {}
     try:
         _q = 'search'
-        if query['search']: params['$search'] = query['search']
+        if 'search' in query and query['search']: params['$search'] = query['search']
         _q = 'filter'
-        if query['filter']: params['$filter'] = query['filter']
+        if 'filter' in query and query['filter']: params['$filter'] = query['filter']
         _q = 'raw_params'
-        if query['raw_params']:
+        if 'raw_params' in query and query['raw_params']:
             _raw_params = query['raw_params'].split("&")
             params.update({i.split("=")[0]:i.split("=")[1] for i in _raw_params})
         _q = 'skip_publishers'
@@ -272,6 +273,7 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
         else:
             # console.print(f"Failed to fetch {option}: {e}", style="bold red")
             log.error(f"Failed to fetch {option}: {e}")
+            log.error(params)
             raise Exception(f"Failed to fetch {option}: {e}")
             # return []
         pass
@@ -302,17 +304,14 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
     
 
 
-def save_job(job: MigrationJob):
-    
-    db = Database.get_collection(MigrationJob.Settings.name)
-    db.update_one({"_id": ObjectId(job.id)}, {"$set": job.model_dump(exclude=["source_tenant", "destination_tenants", "apps","name","search_params","apps_type"])})
-
-
-
 async def post_process_migration_job(job: MigrationJob):
     """
     Post processing of migration job.
     """
+    
+    job.status = Status.IN_PROGRESS
+    apps = job.apps if job.apps_type == AppsType.applications else job.service_principals
+    
     # console.rule("Post Processing Migration Job", style="bold magenta")
     # For completed jobs, create credentials
     if job.apps_type == AppsType.applications:
@@ -346,17 +345,17 @@ async def post_process_migration_job(job: MigrationJob):
 
         today = datetime.datetime.now(tz=datetime.timezone.utc)  #+ datetime.timedelta(days=1) # UTC time
 
-        for i in range(len(job.apps)):
+        for i in range(len(apps)):
             try:
                 # console.print(apps[i])
                 if job.apps_type == AppsType.applications:
-                    old_app = ApplicationModel(**job.apps[i])
+                    old_app = ApplicationModel(**apps[i])
                 if job.apps_type == AppsType.servicePrincipals:
-                    old_app = ServicePrincipalModel(**job.apps[i])
+                    old_app = ServicePrincipalModel(**apps[i])
                 # console.print(old_app.post_model())
                 
             except Exception as e: 
-                yield f"❌ Failed to parse app data for {job.apps[i].get('displayName','?')}: {e}"
+                yield f"❌ Failed to parse app data for {apps[i].get('displayName','?')}: {e}"
                 continue
             
         
@@ -365,7 +364,7 @@ async def post_process_migration_job(job: MigrationJob):
                 yield f"❌ App '{old_app.displayName}' NOT migrated to {dest.name}"
                 continue
             
-            if job.migration_options.new_app_suffix:
+            if job.migration_options.new_app_suffix: # TODO Change to use template, ... NOTE not really fundamental, only for logging 
                 old_app.displayName += " " + job.migration_options.new_app_suffix
                 
             yield f"Post processing app '{old_app.displayName}' on {dest.name}"
@@ -373,8 +372,8 @@ async def post_process_migration_job(job: MigrationJob):
             endpoint = dest_tenant.endpoint.replace("/v1.0","").strip('/') + "/v1.0/"
             endpoint += str(job.apps_type.value)
             
-            new_app = job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data']
-            
+            new_app = job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data'] if job.apps_type == AppsType.applications else job.sp_id_mapping[old_app.appId][dest_tenant.client_id]['data']
+
             # execute creation
             try:
                 
@@ -551,9 +550,8 @@ async def post_process_migration_job(job: MigrationJob):
                     yield f"❌ Failed to post process app '{old_app.displayName}' on '{dest.name}':\n {e}"
             
             yield "Post Processing Complete"
-            
-            # Save updated migration job
-            # save_job(job) # DEBUG
+            job.status = Status.COMPLETED
+
             
             await asyncio.sleep(1)
 
@@ -585,14 +583,14 @@ async def process_migration_job(job: MigrationJob):
         - REVIEW
             migrate/onboard? apps - 
             naming conventions  - enforce preagreed naming/formats - examples?
-            dedicated group... salepoint, request, receive access.... assign predefined group to app.
+            assignment group... salepoint, request, receive access.... assign predefined group to app.
             - access profile
             
             
             KEY POINTS:
                 - GUI - modify JSON before sending/remove params, 
                 - Azure AD Group assigned to new App - For SAML (Enterprise Apps) apps.
-                - App Naming convention 
+                - App Naming convention eg.
                 - Integration with Sailpoint IdentityNow APIS.
                 - Service Principals
                 - OpenID Endpoint Urls
@@ -619,8 +617,8 @@ async def process_migration_job(job: MigrationJob):
     
     failures = []
     
-    if job.status != Status.APPROVED:
-        raise Exception(f"Migration job is NOT Pending  ({job.status.value})")
+    # if job.status != Status.APPROVED:
+    #     raise Exception(f"Migration job is NOT Pending  ({job.status.value})")
     
     # Dont need Source Tenant since we already have the JSON object of apps to migrate.
     
@@ -651,7 +649,7 @@ async def process_migration_job(job: MigrationJob):
         try:
             
             # Migrate apps
-            apps = job.apps
+            apps = job.apps if job.apps_type == AppsType.applications else job.service_principals
             job.status = Status.IN_PROGRESS
 
             yield f"Migrating '{len(apps)}' '{job.apps_type}' to '{dest_tenant.name}'"
@@ -662,14 +660,15 @@ async def process_migration_job(job: MigrationJob):
                 
                 try:
                     
-                    yield f"Parsing app data for {apps[i].get('displayName','?')}"
+                    yield f"Parsing {job.apps_type} app data for {apps[i].get('displayName','?')}"
                     await asyncio.sleep(0.3)
                     # console.print(apps[i])
                     if job.apps_type == AppsType.applications:
                         _data = ApplicationModel(**apps[i])
-                    if job.apps_type == AppsType.servicePrincipals:
+                    elif job.apps_type == AppsType.servicePrincipals:
                         _data = ServicePrincipalModel(**apps[i])
-                    
+                    else:
+                        raise Exception("Error in table format. Invalid AppsType")
                     # console.print(_data.post_model())
                     
                 except Exception as e: 
@@ -679,10 +678,17 @@ async def process_migration_job(job: MigrationJob):
                 
             
                 # Check if app is already migrated.
-                if job.app_id_mapping.get(_data.appId, {}).get(dest_tenant.client_id):
-                    yield f"App '{_data.displayName}' already migrated to {dest_tenant.name}"
-                    await asyncio.sleep(0.1)
-                    continue
+                if job.apps_type == AppsType.applications:
+                    if job.app_id_mapping.get(_data.appId, {}).get(dest_tenant.client_id):
+                        yield f"App '{_data.displayName}' already migrated to {dest_tenant.name}"
+                        await asyncio.sleep(0.1)
+                        continue
+                if job.apps_type == AppsType.servicePrincipals:
+                    if job.sp_id_mapping.get(_data.appId, {}).get(dest_tenant.client_id):
+                        yield f"Service Principal '{_data.displayName}' already migrated to {dest_tenant.name}"
+                        await asyncio.sleep(0.1)
+                        continue
+
                 
                 # print(_data)
                 yield f"Migrating app '{_data.displayName}' to {dest_tenant.name}"
@@ -703,9 +709,43 @@ async def process_migration_job(job: MigrationJob):
                         delattr(_data, 'identifierUris')
                         # _data.identifierUris = [x for x in _data.identifierUris if not x.startswith("api://")]
                 if job.apps_type == AppsType.servicePrincipals:
+                    # Walk the manifest and swap old id for the new AppId
+                    old_app_id = _data.appId
+                    if old_app_id in job.app_id_mapping:
+                        yield "Swapping AppIds..."
+                        _new_app_id = job.app_id_mapping[old_app_id][dest_tenant.client_id]['appId']
+                        if not _new_app_id:
+                            # raise Exception(f"Failed to get new app id for app '{_data.displayName}'") # TODO What is the fallback? ie. We are migrating an app that has not been migrated / registered.
+                            yield f"❌ Failed to get new app id for app '{_data.displayName}'. App seems to not have been migrated yet."
+                            continue
+                        
+                        _data.appId = _new_app_id
+                        
+                        # Walk the manifest and swap old id for the new AppId
+                        def _swap_appids(key, value):
+                            if isinstance(value, str):
+                                if old_app_id in value:
+                                    print("Swapping AppIds:", key, value, "->", value.replace(old_app_id, _new_app_id))
+                                    return value.replace(old_app_id, _new_app_id)
+                            elif isinstance(value, list):
+                                new_values = []
+                                for x in value:
+                                    if old_app_id in x and isinstance(x, str):
+                                        new_values.append(x.replace(old_app_id, _new_app_id))
+                                        print("Swapping AppIds:", key, x, "->", x.replace(old_app_id, _new_app_id))
+                                    else:
+                                        new_values.append(x)
+                                return new_values
+                            return value
+                        _new_data = dict_walk(_data.model_dump(), _swap_appids)
+                        if _new_data:
+                            yield "Swapping AppIds... Done"
+                            _data = ServicePrincipalModel(**_new_data)
+                            
                     # Drop specific key:values
                     # add them afterwards
                     if hasattr(_data, 'servicePrincipalNames'): delattr(_data, 'servicePrincipalNames') # recreate servicePrincipalNames after creation.
+                    # Replace AppIds with new AppIds
                     
                         
                 
@@ -715,13 +755,13 @@ async def process_migration_job(job: MigrationJob):
                     if not _data.appId:
                         raise Exception(f"App '{_data.displayName}' does not have an appId.")
                     
-                    if job.migration_options.new_app_suffix:
+                    if job.migration_options.new_app_suffix: # TODO use template instead
                         _data.displayName += " " + job.migration_options.new_app_suffix
                     
                     if job.migration_options.use_upsert:
                         
                         req = server_request(
-                            endpoint + "(appId='{appId}')".format(appId=_data.appId), 
+                            endpoint + "(appId='{appId}')".format(appId=_data.appId), # TODO Upsert should refer to the NEW appId, not the old one!
                             method="PATCH", 
                             data=_data.post_model(), 
                             api_key=dest_tenant.access_token, 
@@ -748,36 +788,61 @@ async def process_migration_job(job: MigrationJob):
                         if not _new_app_id:
                             raise Exception(f"Failed to get new app id for newly created app '{_data.displayName}'")
 
-                        if _data.appId not in job.app_id_mapping:
-                            job.app_id_mapping[_data.appId] = {}
-                        job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _new_app_id, "data": req.json() }})
+                        # Applications
+                        if job.apps_type == AppsType.applications:
+                            if _data.appId not in job.app_id_mapping: 
+                                job.app_id_mapping[_data.appId] = {}
+                            job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _new_app_id, "data": req.json() }})
+                        
+                        # Service Principals
+                        if job.apps_type == AppsType.servicePrincipals:
+                            if _data.appId not in job.sp_id_mapping:
+                                job.sp_id_mapping[_data.appId] = {}
+                            job.sp_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _new_app_id, "data": req.json() }})
                 
                     elif req and req.status_code == 204: # no response code for PATCH
                         yield f"✅ App '{_data.displayName}' UPDATED successfully in {dest_tenant.name}"
-                        if _data.appId not in job.app_id_mapping:
-                            job.app_id_mapping[_data.appId] = {}
-                        job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _data.appId, "data": _data.model_dump() }})
+                        if job.apps_type == AppsType.applications:
+                            if _data.appId not in job.app_id_mapping: 
+                                job.app_id_mapping[_data.appId] = {}
+                            job.app_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _data.appId, "data": _data.model_dump() }})
+                        if job.apps_type == AppsType.servicePrincipals:
+                            if _data.appId not in job.sp_id_mapping:
+                                job.sp_id_mapping[_data.appId] = {}
+                            job.sp_id_mapping[_data.appId].update({dest_tenant.client_id: {"appId": _data.appId, "data": _data.model_dump() }})
+
                     else:
                         raise Exception()
 
                 except Exception as e:
                         # Store failed attempt in migration job
                         # Check if req has been defined
+                        _fail = {}
                         if 'req' in locals():
                             yield f"❌ Failed to migrate app '{_data.displayName}' to {dest_tenant.name}:\n RESPONSE CODE {req.status_code} {req.text}"
                             failures.append({"destination": dest_tenant.client_id, "app": _data, "response": req.text, "status": req.status_code })
-                            if dest_tenant.client_id not in job.apps_failed:
-                                job.apps_failed[_data.appId] = {}
-                            job.apps_failed[_data.appId].update({dest_tenant.client_id: {"app": _data, "response": req.json(), "status": req.status_code }})
+                            # if dest_tenant.client_id not in job.apps_failed:
+                                # job.apps_failed[_data.appId] = {}
+                            # job.apps_failed[_data.appId].update({dest_tenant.client_id: {"app": _data, "response": req.json(), "status": req.status_code }})
+                            _fail = {dest_tenant.client_id: {"app": _data, "response": req.json(), "status": req.status_code }}
                         else:
                             yield f"❌ Failed to migrate app '{_data.displayName}' to {dest_tenant.name}:\n {e}"
                             failures.append({"destination": dest_tenant.client_id, "app": _data, "response": str(e), "status": 500 })
-                            if dest_tenant.client_id not in job.apps_failed:
+                            # if dest_tenant.client_id not in job.apps_failed:
+                                # job.apps_failed[_data.appId] = {}
+                            # job.apps_failed[_data.appId].update({dest_tenant.client_id: {"app": _data, "response": str(e), "status": 500 }})
+                            _fail = {dest_tenant.client_id: {"app": _data, "response": str(e), "status": 500 }}
+
+                        if job.apps_type == AppsType.applications:
+                            if _data.appId not in job.apps_failed: 
                                 job.apps_failed[_data.appId] = {}
-                            job.apps_failed[_data.appId].update({dest_tenant.client_id: {"app": _data, "response": str(e), "status": 500 }})
+                            job.apps_failed[_data.appId].update({dest_tenant.client_id: {"appId": _data.appId, "data": _data.model_dump() }})
+                        if job.apps_type == AppsType.servicePrincipals:
+                            if _data.appId not in job.sp_failed:
+                                job.sp_failed[_data.appId] = {}
+                            job.sp_failed[_data.appId].update(_fail)
+
                         await asyncio.sleep(0.1)
-                # TODO Save updated migration job
-                # job.save()
                 
                 await asyncio.sleep(2)
 
@@ -796,20 +861,63 @@ async def process_migration_job(job: MigrationJob):
         
     if failures:
         yield f"❌ Migration failed for some apps"
+        yield str(failures)
         # console.print(failures)
         job.status = Status.FAILED
     else:
         yield f"✅ Migration completed successfully"
         job.status = Status.COMPLETED
-        # Post Processing
-        # console.print("Post Processing...", style="bold green")
-        yield "Post Processing Apps..."
-        async for result in post_process_migration_job(job):
-            yield result    
-        # post_process_migration_job(job)
+
     
-    # TODO job.save()
-    # save_job(job) # DEBUG
-    print(job)
     
-    # TODO migration_job_report(job)
+async def process_service_principal_migration(job: MigrationJob, source_tenant: Tenant):
+    """
+    Processing of Service Principals.
+    1. Go through the apps that have been migrated, and search for corresponding Service Princicpals.
+    2. Replace AppIds with the new AppIds.
+    3. Migrate Service Principals to destination tenants.
+    """
+    
+    yield "Searching for Service Principals related to migrated Apps"
+    
+    # Prepare tenant object
+    if not source_tenant.access_token:
+        source_tenant = connect_tenant(source_tenant.model_dump())
+    
+    if not source_tenant or not source_tenant.access_token:
+        yield "Failed to connect to the source tenant!"
+        job.status = Status.FAILED
+        return
+    
+    app_ids = job.app_id_mapping.keys()
+    if not app_ids: 
+        yield "No apps found to migrate!"
+        job.status = Status.COMPLETED
+        return
+    
+    app_ids = [f"'{i}'" for i in app_ids]
+        
+    try:
+        # list_of_apps = msapp.fetch_listing(migration_job.apps_type, endpoint=f"/{migration_job.apps_type}", tenant=tenant, query={
+        _q = {
+            # "search": _search.value, 
+            "filter": f"appId in [{','.join(app_ids)}]", 
+            # "raw_params": _raw.value, 
+            # "skip_publishers": _skip_publishers.value if _skip_publishers and _app_type.value == 'servicePrincipals' else None, 
+        }
+        list_of_apps = fetch_listing(job.apps_type.value, endpoint=f"/{job.apps_type.value}", tenant=source_tenant, query=_q)
+    except Exception as e:
+        yield f"Failed to fetch listing: {e}"
+        job.status = Status.FAILED
+        return
+
+    yield f"Found {len(list_of_apps)} {job.apps_type.value} to migrate."
+    
+    if list_of_apps and len(list_of_apps)>0:
+        # We have SP to migrate
+        job.service_principals = list_of_apps
+    
+    job.status = Status.COMPLETED
+    
+    
+    

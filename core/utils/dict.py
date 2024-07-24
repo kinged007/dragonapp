@@ -39,7 +39,7 @@ def dict_walk(data, func, *args, **kwargs):
                 if isinstance(item, dict):
                     dict_walk(item, func, *args, **kwargs)
                 else:
-                    value[i] = func(item, *args, **kwargs)
+                    value[i] = func(i, item, *args, **kwargs)
         else:
-            data[key] = func(value, *args, **kwargs)
+            data[key] = func(key, value, *args, **kwargs)
     return data

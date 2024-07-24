@@ -37,12 +37,12 @@ class keyCredentialResource(BaseModel):
     """
     keyCredential Schema: https://learn.microsoft.com/en-us/graph/api/resources/keycredential?view=graph-rest-1.0
     """
-    customKeyIdentifier: Optional[str] = None 
+    # customKeyIdentifier: Optional[str] = None 
     displayName: Optional[str] = None
     endDateTime: Optional[str] = None  # DateTimeOffset : The timestamp when the current certification for the application expires. ISO 8601 format and is always in UTC time
-    key: Optional[str] = None
-    keyId: Optional[str] = None
-    startDateTime: Optional[str] = None
+    # key: Optional[str] = None
+    # keyId: Optional[str] = None
+    # startDateTime: Optional[str] = None
     type: Optional[str] = None
     usage: Optional[str] = None
 
@@ -52,7 +52,7 @@ class oauth2PermissionScopeResource(BaseModel):
     """
     adminConsentDescription: Optional[str] = None
     adminConsentDisplayName: Optional[str] = None
-    id: Optional[str] = None
+    # id: Optional[str] = None
     isEnabled: Optional[bool] = False
     type: Optional[str] = None
     userConsentDescription: Optional[str] = None
@@ -67,13 +67,13 @@ class passwordCredentialResource(BaseModel):
 
 
     """
-    customKeyIdentifier: Optional[str] = None
+    # customKeyIdentifier: Optional[str] = None
     displayName: Optional[str] = None
     endDateTime: Optional[str] = None
-    hint: Optional[str] = None
-    keyId: Optional[str] = None
-    secretText: Optional[str] = None
-    startDateTime: Optional[str] = None
+    # hint: Optional[str] = None
+    # keyId: Optional[str] = None
+    # secretText: Optional[str] = None
+    # startDateTime: Optional[str] = None
 
 class resourceSpecificApplicationPermission(BaseModel):
     """
@@ -118,7 +118,7 @@ class ServicePrincipalModel(BaseModel):
     applicationTemplateId: Optional[str] = None
     appOwnerOrganizationId: Optional[str] = None
     appRoleAssignmentRequired: Optional[bool] = False
-    appRoles: Optional[List[appRoleResource]] = None
+    # appRoles: Optional[List[appRoleResource]] = None # Potentially not utilized. TODO check if migrated apps are using this or not, or additional roles apart from standard.
     customSecurityAttributes:Optional[str] = None
     deletedDateTime: Optional[str] = None # ISO 8601 format and is always in UTC time
     description: Optional[str] = None

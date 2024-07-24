@@ -227,11 +227,12 @@ class DatabaseMongoBaseModel(PydanticBaseModel, metaclass=DatabaseMongoBaseModel
         """
         try:
             _dict = super().model_dump(mode=mode, include=include, exclude=exclude, by_alias=by_alias, exclude_unset=exclude_unset, exclude_defaults=exclude_defaults, exclude_none=exclude_none, round_trip=round_trip, warnings=warnings)
-            if Database.using_tinydb:
-                _dict['_id'] = str(_dict['id'])
-            else:
-                _dict['_id'] = PydanticObjectId(_dict['id'])
-            _dict.pop('id', None)
+            if _dict.get('id', None):
+                if Database.using_tinydb:
+                    _dict['_id'] = str(_dict['id'])
+                else:
+                    _dict['_id'] = PydanticObjectId(_dict['id'])
+                _dict.pop('id', None)
             return _dict
         except Exception as e:
             log.error(f"Failed to dump model: {e}")

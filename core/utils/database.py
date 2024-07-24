@@ -74,7 +74,7 @@ class DragonTinyMongoCollection(TinyMongoCollection):
     # for TinyDB compatibility, we need to convert the _id field to a string
     def parse_query(self, query):
         if query != {} or not query is None:
-            query = dict_walk(query, lambda x: str(x) if isinstance(x, ObjectId) else x)
+            query = dict_walk(query, lambda k,v: str(v) if isinstance(v, ObjectId) else v)
         return super().parse_query(query)
     
         
