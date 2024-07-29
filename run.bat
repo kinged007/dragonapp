@@ -46,51 +46,29 @@ echo %* | find "--upgrade" >nul
 if %ERRORLEVEL% equ 0 (
     echo Upgrading dependencies...
 
-    :: Define the initial directories to start the recursive search
-    set "initialDirs=.\;.\app;.\core"
-
-    :: Convert the list into an array-like structure and loop through it
-    for %%i in (%initialDirs%) do (
-        :: Loop through all directories starting from the initial ones, recursively
-        for /d /r "%%i" %%d in (*) do (
-            set "dir=%%d"
-            set "dirName=%%~nxd"
-
-            :: Check if the directory name starts with a dot (hidden folder)
-            if not "!dirName:~0,1!"=="." (
-                :: Check if 'requirements.txt' exists in the directory
-                if exist "%%d\requirements.txt" (
-                    echo Installing requirements from %%d\requirements.txt
-                    pip install --upgrade -r "%%d\requirements.txt" !PIP_PROXY!
-                )
-            )
+    for /r %%i in (requirements.txt) do (
+        :: Check if 'requirements.txt' exists in the directory
+        if exist "%%i" (
+            echo Upgrading requirements from %%i
+            pip install --upgrade -r "%%i" !PIP_PROXY!
         )
-    )    
+
+    )
+
     echo Upgraded dependencies. Please restart the application.
     exit /b 0
+
 ) else (
     echo Installing dependencies
     
-    :: Define the initial directories to start the recursive search
-    set "initialDirs=.\;.\app;.\core"
-
-    :: Convert the list into an array-like structure and loop through it
-    for %%i in (%initialDirs%) do (
-        :: Loop through all directories starting from the initial ones, recursively
-        for /d /r "%%i" %%d in (*) do (
-            set "dir=%%d"
-            set "dirName=%%~nxd"
-
-            :: Check if the directory name starts with a dot (hidden folder)
-            if not "!dirName:~0,1!"=="." (
-                :: Check if 'requirements.txt' exists in the directory
-                if exist "%%d\requirements.txt" (
-                    echo Installing requirements from %%d\requirements.txt
-                    pip install --upgrade -r "%%d\requirements.txt" !PIP_PROXY!
-                )
-            )
+    for /r %%i in (requirements.txt) do (
+        :: Check if 'requirements.txt' exists in the directory
+        if exist "%%i" (
+            echo Installing requirements from %%i
+            pip install --upgrade -r "%%i" !PIP_PROXY!
         )
-    )    
+
+    )
 )
 
 :: Start the Admin application
