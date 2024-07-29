@@ -15,7 +15,7 @@ Module.load_core(['admin_panel']) # ,'frontend','ai','messaging','locale'])
 # Register modules with the app, so it will import it.
 # Module.load(['ms-entra'])
 # Module.load(['bookshelf','ms-entra','pollygene'])
-Module.load(['my_module','ms-entra','shlink','bookshelf'])
+Module.load(['ms-entra'])
 # Module.load()
 # Modules.load('something_else') 
 
