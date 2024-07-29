@@ -238,7 +238,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                                         ui.notify(f"✅ Deleted {type}:{app_id} from {dest_tenant.name}")
                                     else:
                                         log.error(req.text)
-                                        ui.notify(f"❌ Failed to delete {type}:{app_id} from {dest_tenant.name}", type='negative')
+                                        ui.notify(f"❌ Failed to delete {type}:{app_id} from {dest_tenant.name}: {req.text}", type='negative')
 
                                 except Exception as e:
                                     log.error(e)
