@@ -29,7 +29,7 @@ call venv\Scripts\activate.bat
 
 :: Check if "--upgrade" is passed in the arguments
 echo %* | find "--upgrade" >nul
-if %ERRORLEVEL% eq 0 (
+if %ERRORLEVEL% equ 0 (
     echo Upgrading dependencies...
     for /r %%i in (requirements.txt) do (
         echo Installing requirements from %%i
@@ -48,7 +48,6 @@ if %ERRORLEVEL% eq 0 (
 :: Start the Admin application
 echo Starting the Dragon Panel application
 echo TODO
-
 :: Start the application
 echo Starting the Dragon App
 uvicorn main:app --host 0.0.0.0 --port 88 %* --reload
