@@ -3,9 +3,15 @@
 setlocal
 setlocal enabledelayedexpansion
 
-:: Load .env file and extract PROXY value
+:: Check if the .env file exists
+if not exist ".env" (
+    echo Error: .env file not found.
+    exit /b 1
+)
+
+:: Load environment variables from .env file
 set PROXY=
-for /f "delims=" %%a in ('type .env ^| findstr /B "PROXY="') do set %%a
+for /f "delims=" %%a in ('type .env ^| findstr /B "PROXY= REDIS_HOST="') do set %%a
 
 :: Check if PROXY has a value
 if not "!PROXY!"=="" (
@@ -33,12 +39,30 @@ if %ERRORLEVEL% neq 0 (
 cd %~dp0
 
 if not exist "venv" (
+
     echo Creating virtual environment
     python -m venv venv
-)
 
-echo Activating virtual environment
-call venv\Scripts\activate.bat
+    echo Activating virtual environment
+    call venv\Scripts\activate.bat
+
+    echo Installing dependencies
+    
+    for /r %%i in (requirements.txt) do (
+        :: Check if 'requirements.txt' exists in the directory
+        if exist "%%i" (
+            echo Installing requirements from %%i
+            pip install -r "%%i" !PIP_PROXY!
+        )
+
+    )
+
+) else (
+    
+    echo Activating virtual environment
+    call venv\Scripts\activate.bat
+
+)
 
 
 :: Check if "--upgrade" is passed in the arguments
@@ -52,22 +76,37 @@ if %ERRORLEVEL% equ 0 (
             echo Upgrading requirements from %%i
             pip install --upgrade -r "%%i" !PIP_PROXY!
         )
-
     )
 
     echo Upgraded dependencies. Please restart the application.
     exit /b 0
 
-) else (
-    echo Installing dependencies
-    
-    for /r %%i in (requirements.txt) do (
-        :: Check if 'requirements.txt' exists in the directory
-        if exist "%%i" (
-            echo Installing requirements from %%i
-            pip install --upgrade -r "%%i" !PIP_PROXY!
+) 
+
+
+:: Check if Redis is available and start the worker
+if defined REDIS_HOST (
+    echo Argument: %1
+    if "%~1"=="--worker" (
+        echo Starting the Redis worker
+        :: Default REDIS_PORT to 6379 if not set
+        if not defined REDIS_PORT set REDIS_PORT=6379
+
+        :: Check if REDIS_PORT is a valid integer
+        echo %REDIS_PORT%| findstr /r "^[0-9][0-9]*$" >nul
+        if errorlevel 1 (
+            echo Error: REDIS_PORT is not a valid integer: %REDIS_PORT%
+            exit /b 1
         )
 
+        :: Default REDIS_PASSWORD to empty if not set
+        if not defined REDIS_PASSWORD set REDIS_PASSWORD=
+
+        :: MacOS workaround not applicable in Windows
+        :: Start rq worker (adjust command as needed for Windows environment)
+        start rq worker task_manager --with-scheduler --url redis://default:%REDIS_PASSWORD%@%REDIS_HOST%:%REDIS_PORT%
+        :: Windows does not support trapping signals in the same way as Unix shells
+        :: Manual cleanup may be required
     )
 )
 

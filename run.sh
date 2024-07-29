@@ -1,12 +1,21 @@
 #!/bin/bash
 
-echo "Starting Dragon API..."
 
-# if ! command -v python3 &> /dev/null;
-# then
-#     echo Python3 is not installed
-#     exit 1
-# fi
+# Check if the .env file exists
+if [ ! -f ".env" ]; then
+    echo "Error: .env file not found."
+    exit 1
+fi
+
+# Load environment variables from .env file
+export $(grep -E '^(PROXY|REDIS_HOST)=' .env | xargs)
+
+# Check if PROXY has a value
+if [ ! -z "$PROXY" ]; then
+    PIP_PROXY="--proxy $PROXY"
+else
+    PIP_PROXY=""
+fi
 
 # Check if python3 is available
 if command -v python3 &>/dev/null; then
@@ -32,6 +41,8 @@ fi
 
 cd "$(dirname "$0")" || exit
 
+echo "Starting Dragon API..."
+
 if [ ! -d "venv" ];
 then
     echo Creating virtual environment
@@ -44,7 +55,7 @@ then
     # $PIP install -r requirements.txt --upgrade
     for FILE in $REQUIREMENTS_FILES; do
         echo "Installing requirements from $FILE"
-        $PIP install -r $FILE --upgrade
+        $PIP install -r $FILE --upgrade $PIP_PROXY
     done
     
     # $PIP install -r vendor/gpt-researcher/requirements.txt --upgrade
@@ -61,7 +72,7 @@ else
         REQUIREMENTS_FILES=$(find . -type f -name 'requirements.txt')
         for FILE in $REQUIREMENTS_FILES; do
             echo "Installing requirements from $FILE"
-            $PIP install --upgrade -r $FILE
+            $PIP install --upgrade -r $FILE $PIP_PROXY
         done
         # $PIP install --upgrade -r vendor/gpt-researcher/requirements.txt
         echo "Upgraded dependencies. Please restart the application."
@@ -84,6 +95,7 @@ if [ -n "$REDIS_HOST" ] && [[ "${@}" =~ "--worker" ]]; then
     export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     rq worker task_manager --with-scheduler --url redis://default:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT &
     RQ_WORKER_PID=$!
+    # Proxy needed for Redis Worker?
     trap "echo 'Stopping rq worker'; kill $RQ_WORKER_PID" EXIT
 fi
 
@@ -94,4 +106,4 @@ echo TODO
 # Start the application
 echo "Starting the Dragon App"
 # $PYTHON main.py "$@"
-uvicorn main:app --host 0.0.0.0 --port 88 "$@" --reload
+uvicorn main:app --host 0.0.0.0 --port 88 "$@" --reload $PIP_PROXY
