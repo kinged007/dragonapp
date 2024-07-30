@@ -251,7 +251,7 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
         raise Exception(f"Failed to parse query '{_q}': {e}")
         
     endpoint_url = f"{tenant.endpoint}/{endpoint.strip('/')}"
-    
+    log.debug(f"Endpoint: {endpoint_url}")
     # console.print(params)
     
     try:

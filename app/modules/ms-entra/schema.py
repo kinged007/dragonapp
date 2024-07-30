@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any, Union, Optional, List, Literal
-from pydantic import BaseModel, Field, SecretStr, EmailStr, AnyUrl, AnyHttpUrl, root_validator
+from pydantic import BaseModel, Field, SecretStr, EmailStr, AnyUrl, AnyHttpUrl, model_validator
 import json
 from core.schemas import database
 from .src.utils import dict_diff
@@ -61,12 +61,13 @@ class Tenant(database.DatabaseMongoBaseModel):
     # file: Optional[str] = Field(None, description="The name of the tenant")
     access_token: Optional[str] = Field(None, description="The access token of the tenant", json_schema_extra={"hidden": True,  "password_visible": False})
     
-    @root_validator
-    def fix_endpoint(cls, values):
+    @model_validator(mode="after")
+    def fix_endpoint(self):
         """Simply ensures that the endpoint url has dropped the last slash if it exists"""
-        if 'endpoint' in values:
-            values['endpoint'] = values['endpoint'].rstrip('/')
-        return values
+        if self.endpoint:
+            # self.endpoint = self.endpoint.strip('/')
+            print("++++++++++++++", self)
+        return self
         
     class Settings:
         name = "ms_entra_tenants"
