@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any, Union, Optional, List, Literal
-from pydantic import BaseModel, Field, SecretStr, EmailStr, AnyUrl, AnyHttpUrl
+from pydantic import BaseModel, Field, SecretStr, EmailStr, AnyUrl, AnyHttpUrl, root_validator
 import json
 from core.schemas import database
 from .src.utils import dict_diff
@@ -56,12 +56,18 @@ class Tenant(database.DatabaseMongoBaseModel):
     client_id: str = Field(..., description="The client ID of the tenant")
     scope: List[str] = Field(["https://graph.microsoft.com/.default"], description="The scope of the tenant")
     secret: str = Field(..., description="The secret of the tenant", json_schema_extra={"format": "password", "password_visible": True}) # TODO Make secret not visible
-    endpoint: str = Field("https://graph.microsoft.com/v1.0", description="The base URL of the tenant")
+    endpoint: str = Field("https://graph.microsoft.com/v1.0", description="The base URL of the tenant. Define here /v1.0 or /beta.")
     # created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="The creation time of the tenant")
     # file: Optional[str] = Field(None, description="The name of the tenant")
     access_token: Optional[str] = Field(None, description="The access token of the tenant", json_schema_extra={"hidden": True,  "password_visible": False})
     
-    
+    @root_validator
+    def fix_endpoint(cls, values):
+        """Simply ensures that the endpoint url has dropped the last slash if it exists"""
+        if 'endpoint' in values:
+            values['endpoint'] = values['endpoint'].rstrip('/')
+        return values
+        
     class Settings:
         name = "ms_entra_tenants"
         title = "Entra Tenants"
@@ -73,6 +79,8 @@ class Tenant(database.DatabaseMongoBaseModel):
             "type": "database_ref",
             "display_field": "{name}"
         }
+        
+    
 
 # Migration Job
 

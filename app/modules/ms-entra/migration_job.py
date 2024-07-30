@@ -218,7 +218,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                             log.error(e)
                             raise Exception(f"Failed to connect to destination tenant: {dest_tenant.name}")
                         
-                        endpoint = dest_tenant.endpoint.replace("/v1.0","").strip('/') + "/v1.0/"
+                        endpoint = dest_tenant.endpoint
                         apps = migration_job.app_id_mapping if type == 'applications' else migration_job.sp_id_mapping
                         for k,v in apps.items():
                             if v.get(dest_tenant.client_id):
@@ -226,7 +226,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                                 ui.notify(f"Deleting {type} from {dest_tenant.name}")
                                 # TODO delete apps
                                 try:
-                                    endpoint += f"{type}(appId='{app_id}')"
+                                    endpoint += f"/{type}(appId='{app_id}')"
                                     req = server_request(
                                         endpoint, 
                                         method="DELETE", 

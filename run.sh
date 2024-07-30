@@ -106,4 +106,4 @@ echo TODO
 # Start the application
 echo "Starting the Dragon App"
 # $PYTHON main.py "$@"
-uvicorn main:app --host 0.0.0.0 --port 88 "$@" --reload $PIP_PROXY
+uvicorn main:app --host 0.0.0.0 --port 88 "$@" --reload 

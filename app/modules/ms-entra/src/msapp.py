@@ -71,99 +71,99 @@ def get_access_token(config:dict):
     return None
 
 
-def count_apps( params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None):
-    if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
-    # if not params['$search']: params.pop('$search')
+# def count_apps( params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None):
+#     if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
+#     # if not params['$search']: params.pop('$search')
     
-    _count = tenant_request("/v1.0/applications/$count" , 
-        headers={"ConsistencyLevel": "eventual"}, 
-        params=params, 
-        api_key=access_token, 
-        host=baseurl.replace("/v1.0", "")
-    )
-    return _count
+#     _count = tenant_request("/v1.0/applications/$count" , 
+#         headers={"ConsistencyLevel": "eventual"}, 
+#         params=params, 
+#         api_key=access_token, 
+#         host=baseurl.replace("/v1.0", "")
+#     )
+#     return _count
 
 
-def get_apps(params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None, max_results: int = 999):
-    if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
-    # if not params['$search']: params.pop('$search')
+# def get_apps(params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None, max_results: int = 999):
+#     if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
+#     # if not params['$search']: params.pop('$search')
     
-    count = count_apps(params, baseurl, access_token)
-    params["$top"] = max_results
-    endpoint = baseurl.replace("/v1.0","").strip('/') + "/v1.0/applications"
-    graph_data = []
-    skip = 0
-    # _progress_bar = st.progress(skip/count, text="Fetching data...")
+#     count = count_apps(params, baseurl, access_token)
+#     params["$top"] = max_results
+#     endpoint = baseurl.replace("/v1.0","").strip('/') + "/v1.0/applications"
+#     graph_data = []
+#     skip = 0
+#     # _progress_bar = st.progress(skip/count, text="Fetching data...")
     
-    for i in range(0, count, max_results):
+#     for i in range(0, count, max_results):
         
-        data = tenant_request( endpoint, 
-            headers={"ConsistencyLevel": "eventual"}, 
-            params=params, 
-            api_key=access_token, 
-        )
-        # st.write(params)
-        # st.json(data)
-        if data:
-            graph_data.extend(data["value"])
-            # _progress_bar.progress(skip/st.session_state[f'{_query_key}_total'], text="Fetching data...")
-            if "@odata.nextLink" in data:
-                skip += max_results
-                params = {}
-                endpoint = data["@odata.nextLink"]
-            else:
-                break
-        else:
-            break
-        time.sleep(1)
-    return graph_data
+#         data = tenant_request( endpoint, 
+#             headers={"ConsistencyLevel": "eventual"}, 
+#             params=params, 
+#             api_key=access_token, 
+#         )
+#         # st.write(params)
+#         # st.json(data)
+#         if data:
+#             graph_data.extend(data["value"])
+#             # _progress_bar.progress(skip/st.session_state[f'{_query_key}_total'], text="Fetching data...")
+#             if "@odata.nextLink" in data:
+#                 skip += max_results
+#                 params = {}
+#                 endpoint = data["@odata.nextLink"]
+#             else:
+#                 break
+#         else:
+#             break
+#         time.sleep(1)
+#     return graph_data
 
-def count_service_principals( params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None):
-    if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
-    # if not params['$search']: params.pop('$search')
+# def count_service_principals( params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None):
+#     if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
+#     # if not params['$search']: params.pop('$search')
     
-    _count = tenant_request("/v1.0/servicePrincipals/$count" , 
-        headers={"ConsistencyLevel": "eventual"}, 
-        params=params, 
-        api_key=access_token, 
-        host=baseurl.replace("/v1.0", "")
-    )
-    return _count
+#     _count = tenant_request("/v1.0/servicePrincipals/$count" , 
+#         headers={"ConsistencyLevel": "eventual"}, 
+#         params=params, 
+#         api_key=access_token, 
+#         host=baseurl.replace("/v1.0", "")
+#     )
+#     return _count
 
 
-def get_service_principals(params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None, max_results: int = 999):
-    if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
-    # if not params['$search']: params.pop('$search')
+# def get_service_principals(params: dict = {}, baseurl: str = "https://graph.microsoft.com", access_token: str = None, max_results: int = 999):
+#     if '$search' in params: params["$search"] = params["$search"] if params["$search"].startswith("'") or params["$search"].startswith('"') else f'"{params["$search"]}"'
+#     # if not params['$search']: params.pop('$search')
     
-    count = count_service_principals(params, baseurl, access_token)
-    params["$top"] = max_results
-    endpoint = baseurl.replace("/v1.0","").strip('/') + "/v1.0/servicePrincipals"
-    graph_data = []
-    skip = 0
-    # _progress_bar = st.progress(skip/count, text="Fetching data...")
+#     count = count_service_principals(params, baseurl, access_token)
+#     params["$top"] = max_results
+#     endpoint = baseurl.replace("/v1.0","").strip('/') + "/v1.0/servicePrincipals"
+#     graph_data = []
+#     skip = 0
+#     # _progress_bar = st.progress(skip/count, text="Fetching data...")
     
-    for i in range(0, count, max_results):
+#     for i in range(0, count, max_results):
         
-        data = tenant_request( endpoint, 
-            headers={"ConsistencyLevel": "eventual"}, 
-            params=params, 
-            api_key=access_token, 
-        )
-        # st.write(params)
-        # st.json(data)
-        if data:
-            graph_data.extend(data["value"])
-            # _progress_bar.progress(skip/st.session_state[f'{_query_key}_total'], text="Fetching data...")
-            if "@odata.nextLink" in data:
-                skip += max_results
-                params = {}
-                endpoint = data["@odata.nextLink"]
-            else:
-                break
-        else:
-            break
-        time.sleep(1)
-    return graph_data
+#         data = tenant_request( endpoint, 
+#             headers={"ConsistencyLevel": "eventual"}, 
+#             params=params, 
+#             api_key=access_token, 
+#         )
+#         # st.write(params)
+#         # st.json(data)
+#         if data:
+#             graph_data.extend(data["value"])
+#             # _progress_bar.progress(skip/st.session_state[f'{_query_key}_total'], text="Fetching data...")
+#             if "@odata.nextLink" in data:
+#                 skip += max_results
+#                 params = {}
+#                 endpoint = data["@odata.nextLink"]
+#             else:
+#                 break
+#         else:
+#             break
+#         time.sleep(1)
+#     return graph_data
 
 
 
@@ -250,7 +250,7 @@ def fetch_listing(option:str, endpoint:str, tenant:Tenant, query:dict = {}):
     except Exception as e:
         raise Exception(f"Failed to parse query '{_q}': {e}")
         
-    endpoint_url = f"{tenant.endpoint.strip('/')}/beta/{endpoint.strip('/')}"
+    endpoint_url = f"{tenant.endpoint}/{endpoint.strip('/')}"
     
     # console.print(params)
     
@@ -369,8 +369,7 @@ async def post_process_migration_job(job: MigrationJob):
                 
             yield f"Post processing app '{old_app.displayName}' on {dest.name}"
 
-            endpoint = dest_tenant.endpoint.replace("/v1.0","").strip('/') + "/v1.0/"
-            endpoint += str(job.apps_type.value)
+            endpoint = f"{dest_tenant.endpoint}/{job.apps_type.value}"
             
             new_app = job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data'] if job.apps_type == AppsType.applications else job.sp_id_mapping[old_app.appId][dest_tenant.client_id]['data']
 
@@ -694,8 +693,7 @@ async def process_migration_job(job: MigrationJob):
                 yield f"Migrating app '{_data.displayName}' to {dest_tenant.name}"
                 await asyncio.sleep(0.5)
 
-                endpoint = dest_tenant.endpoint.replace("/v1.0","").strip('/') + "/v1.0/"
-                endpoint += str(job.apps_type.value)
+                endpoint = f"{dest_tenant.endpoint}/{job.apps_type.value}"
                     
                 # migration code here...
                 # Drop specific key:values

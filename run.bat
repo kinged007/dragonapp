@@ -85,34 +85,34 @@ if %ERRORLEVEL% equ 0 (
 
 
 :: Check if Redis is available and start the worker
-if defined REDIS_HOST (
-    echo Argument: %1
-    if "%~1"=="--worker" (
-        echo Starting the Redis worker
-        :: Default REDIS_PORT to 6379 if not set
-        if not defined REDIS_PORT set REDIS_PORT=6379
+::if defined REDIS_HOST (
+::    echo Argument: %1
+::    if "%~1"=="--worker" (
+::        echo Starting the Redis worker
+::        :: Default REDIS_PORT to 6379 if not set
+::        if not defined REDIS_PORT set REDIS_PORT=6379
 
-        :: Check if REDIS_PORT is a valid integer
-        echo %REDIS_PORT%| findstr /r "^[0-9][0-9]*$" >nul
-        if errorlevel 1 (
-            echo Error: REDIS_PORT is not a valid integer: %REDIS_PORT%
-            exit /b 1
-        )
+::        :: Check if REDIS_PORT is a valid integer
+::        echo %REDIS_PORT%| findstr /r "^[0-9][0-9]*$" >nul
+::        if errorlevel 1 (
+::            echo Error: REDIS_PORT is not a valid integer: %REDIS_PORT%
+::            exit /b 1
+::        )
 
-        :: Default REDIS_PASSWORD to empty if not set
-        if not defined REDIS_PASSWORD set REDIS_PASSWORD=
+::        :: Default REDIS_PASSWORD to empty if not set
+::        if not defined REDIS_PASSWORD set REDIS_PASSWORD=
 
-        :: MacOS workaround not applicable in Windows
-        :: Start rq worker (adjust command as needed for Windows environment)
-        start rq worker task_manager --with-scheduler --url redis://default:%REDIS_PASSWORD%@%REDIS_HOST%:%REDIS_PORT%
-        :: Windows does not support trapping signals in the same way as Unix shells
-        :: Manual cleanup may be required
-    )
-)
+::        :: MacOS workaround not applicable in Windows
+::        :: Start rq worker (adjust command as needed for Windows environment)
+::        start rq worker task_manager --with-scheduler --url redis://default:%REDIS_PASSWORD%@%REDIS_HOST%:%REDIS_PORT%
+::        :: Windows does not support trapping signals in the same way as Unix shells
+::        :: Manual cleanup may be required
+::    )
+::)
 
 :: Start the Admin application
 echo Starting the Dragon Panel application
 echo TODO
 :: Start the application
 echo Starting the Dragon App
-uvicorn main:app --host 0.0.0.0 --port 88 %* --reload !PIP_PROXY!
+uvicorn main:app --host 0.0.0.0 --port 88 %* --reload
