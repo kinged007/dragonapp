@@ -65,8 +65,7 @@ class Tenant(database.DatabaseMongoBaseModel):
     def fix_endpoint(self):
         """Simply ensures that the endpoint url has dropped the last slash if it exists"""
         if self.endpoint:
-            # self.endpoint = self.endpoint.strip('/')
-            print("++++++++++++++", self)
+            self.endpoint = self.endpoint.strip('/')
         return self
         
     class Settings:

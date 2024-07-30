@@ -338,6 +338,9 @@ async def post_process_migration_job(job: MigrationJob):
         except Exception as e:
             raise Exception(f"Failed to connect to destination tenant: {dest.name}")
     
+    # Catch failed attempts
+    _failed = False
+    
     for dest_tenant in tenants:
         
         # type declaration
@@ -356,12 +359,14 @@ async def post_process_migration_job(job: MigrationJob):
                 
             except Exception as e: 
                 yield f"❌ Failed to parse app data for {apps[i].get('displayName','?')}: {e}"
+                _failed = True
                 continue
             
         
             # Check if app is already migrated.
             if not job.app_id_mapping.get(old_app.appId, {}).get(dest_tenant.client_id):
                 yield f"❌ App '{old_app.displayName}' NOT migrated to {dest.name}"
+                _failed = True
                 continue
             
             if job.migration_options.new_app_suffix: # TODO Change to use template, ... NOTE not really fundamental, only for logging 
@@ -418,6 +423,7 @@ async def post_process_migration_job(job: MigrationJob):
                                     new_app['passwordCredentials'].append(req.json())
                                 else:
                                     yield f"❌ Failed to create password: {_display_name}: " + str(req.text)
+                                    _failed = True
                 except Exception as e:
                     log.error(f"Failed to create passwordCredentials: {e}")
                     raise Exception(f"Failed to create passwordCredentials: {e}")
@@ -477,6 +483,7 @@ async def post_process_migration_job(job: MigrationJob):
                                 new_app['identifierUris'] = _update_uris
                             else:
                                 yield f"❌ Failed to update identifierUris: " + str(req.text)
+                                _failed = True
                 except Exception as e:
                     log.error(f"Failed to update identifierUris: {e}")
                     raise Exception(f"Failed to update identifierUris: {e}")
@@ -536,6 +543,7 @@ async def post_process_migration_job(job: MigrationJob):
                                 new_app['servicePrincipalNames'] = _update_uris
                             else:
                                 yield f"❌ Failed to update servicePrincipalNames: " + str(req.text)
+                                _failed = True
                 except Exception as e:
                     log.error(f"Failed to update servicePrincipalNames: {e}")
                     raise Exception(f"Failed to update servicePrincipalNames: {e}")
@@ -544,15 +552,24 @@ async def post_process_migration_job(job: MigrationJob):
                 job.app_id_mapping[old_app.appId][dest_tenant.client_id]['data'] = new_app
 
             except Exception as e:
-                    # Store failed attempt in migration job
-                    # Check if req has been defined
-                    yield f"❌ Failed to post process app '{old_app.displayName}' on '{dest.name}':\n {e}"
+                # Store failed attempt in migration job
+                # Check if req has been defined
+                yield f"❌ Failed to post process app '{old_app.displayName}' on '{dest.name}':\n {e}"
+                _failed = True
             
             yield "Post Processing Complete"
-            job.status = Status.COMPLETED
-
-            
             await asyncio.sleep(1)
+            
+            
+    if _failed:
+        job.status = Status.FAILED
+        yield "❌ Post processing completed with some errors"
+        
+    else:
+        job.status = Status.COMPLETED
+        yield "✅ Post processing completed successfully"
+
+    
 
                 
                 
@@ -707,6 +724,7 @@ async def process_migration_job(job: MigrationJob):
                         delattr(_data, 'identifierUris')
                         # _data.identifierUris = [x for x in _data.identifierUris if not x.startswith("api://")]
                 if job.apps_type == AppsType.servicePrincipals:
+                    # Replace AppIds with new AppIds
                     # Walk the manifest and swap old id for the new AppId
                     old_app_id = _data.appId
                     if old_app_id in job.app_id_mapping:
@@ -743,7 +761,11 @@ async def process_migration_job(job: MigrationJob):
                     # Drop specific key:values
                     # add them afterwards
                     if hasattr(_data, 'servicePrincipalNames'): delattr(_data, 'servicePrincipalNames') # recreate servicePrincipalNames after creation.
-                    # Replace AppIds with new AppIds
+                    if hasattr(_data, 'passwordCredentials'): delattr(_data, 'passwordCredentials')
+                    if hasattr(_data, 'keyCredentials'): delattr(_data, 'keyCredentials')
+                    if hasattr(_data, 'oauth2PermissionScopes'): delattr(_data, 'oauth2PermissionScopes')
+
+
                     
                         
                 

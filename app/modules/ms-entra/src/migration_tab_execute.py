@@ -62,7 +62,7 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
                 
                 _log("Executing App Migration...")
                 async for result in msapp.process_migration_job(migration_job):
-                    _log(result)
+                    _log(migration_job.apps_type + " | " + result)
                 
                 _log("Migration of Apps is Complete.")
                 _log(f"Execution status: {migration_job.status}")
@@ -121,7 +121,7 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
                     migration_job.stage = 'post_service_principals'
                 
                 # Update
-                # save_execution(migration_job)
+                save_execution(migration_job)
                 
             ### Post Process Service Principals
             if migration_job.stage == 'post_service_principals':
@@ -137,7 +137,7 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
                     migration_job.stage = 'completed'
                 
                 # Update
-                # save_execution(migration_job)
+                save_execution(migration_job)
                 
                 
                 

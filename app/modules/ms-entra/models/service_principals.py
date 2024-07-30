@@ -132,7 +132,7 @@ class ServicePrincipalModel(BaseModel):
     logoutUrl: Optional[str] = None
     notes: Optional[str] = None
     notificationEmailAddresses: Optional[List[str]] = None
-    oauth2PermissionScopes: Optional[List[oauth2PermissionScopeResource]] = None
+    oauth2PermissionScopes: Optional[List[oauth2PermissionScopeResource]] = None # read-only
     passwordCredentials: Optional[List[passwordCredentialResource]] = None
     preferredSingleSignOnMode: Optional[str] = None
     preferredTokenSigningKeyThumbprint: Optional[str] = None
