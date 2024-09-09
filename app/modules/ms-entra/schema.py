@@ -95,6 +95,7 @@ class MigrationOptions(BaseModel):
     app_naming_template: str = Field("{displayName}", description="The naming template for the new app. Use Microsoft Graph API parameters.") # eg. 
     use_upsert: bool = Field(False, description="Use upsert to update existing apps or create new one if they don't exist")
     migrate_service_principals: bool = Field(True, description="Migrate service principals after Applications have been migrated successfully.")
+    swap_ids_for_new_ids: bool = Field(False, description="Swap the app ids for the new app ids")
     # create group and assign to app (app/SP?)
     
     

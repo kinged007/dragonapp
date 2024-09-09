@@ -10,7 +10,7 @@ from core.common import log, print
 from core.utils.dict import dict_walk
 
 from ..schema import Tenant, MigrationJob, Status, AppsType
-from ..models.applications import ApplicationModel
+from ..models.applications import ApplicationModel, passwordCredentialResource, keyCredentialResource
 from ..models.service_principals import ServicePrincipalModel
 
 def connect_tenant(tenant_data: dict):
@@ -382,6 +382,7 @@ async def post_process_migration_job(job: MigrationJob):
             except Exception as e:
                 log.error(e)
                 yield f"❌ Failed to get new app data for app '{old_app.displayName}': {e}"
+                
             # execute creation
             try:
                 
@@ -398,9 +399,9 @@ async def post_process_migration_job(job: MigrationJob):
                         # Create new passwordCredentials
                         if old_app.passwordCredentials:
                             _passwords = [x for x in old_app.passwordCredentials if not x.endDateTime or parse(x.endDateTime) > today]
-                            # if not _passwords and job.migration_options.generate_new_password_if_all_expired:
-                            #     # Generate new password
-                            #     _passwords = old_app.passwordCredentials[0] if old_app.passwordCredentials else []
+                            if not _passwords and job.migration_options.generate_new_password_if_all_expired:
+                                # Generate new password
+                                _passwords = [passwordCredentialResource(displayName="New Password")]  #old_app.passwordCredentials[0] 
                             for password in _passwords:
                                 # Create password
                                 _display_name = password.displayName if password.displayName else "New Migration Password"
@@ -434,7 +435,50 @@ async def post_process_migration_job(job: MigrationJob):
                 
                 ####### keyCredentials
                 
-                # if hasattr(old_app, 'keyCredentials'): # TODO post process keyCredentials
+                if hasattr(old_app, 'keyCredentials'): # TODO post process keyCredentials
+                    # Requires an existing certificate to be added to the app.
+                    # Add existing certificate to app (requires certificate key in base64 encoded format)
+                    # Generate certificate: https://learn.microsoft.com/en-us/graph/api/serviceprincipal-addtokensigningcertificate?view=graph-rest-1.0&tabs=http
+                    # https://learn.microsoft.com/en-us/graph/api/resources/selfsignedcertificate?view=graph-rest-1.0 
+                    
+                    try:
+                        if old_app.keyCredentials:
+                            _passwords = [x for x in old_app.keyCredentials if not x.endDateTime or parse(x.endDateTime) > today]
+                            # if not _passwords and job.migration_options.generate_new_certificate_if_all_expired:
+                            #     # Generate new password
+                            #     _passwords = [keyCredentialResource(displayName="New Key") ] #old_app.keyCredentials[0] 
+                            for password in _passwords:
+                                # Create password
+                                _display_name = password.displayName if password.displayName else "New Migration Key"
+                                # Check if password exists or created already
+                                if any([x for x in new_app.get('keyCredentials',[]) if x.get('displayName') == _display_name]):
+                                    yield f"KeyCredential '{_display_name}' already exists..."
+                                    continue
+                                # Create new password
+                                # req = server_request(
+                                #     endpoint + f"/{new_app['id']}/addKey", 
+                                #     method="POST", 
+                                #     data={
+                                #         "keyCredential": {
+                                #             "displayName": _display_name,
+                                #         }
+                                #     }, 
+                                #     api_key=dest_tenant.access_token, 
+                                #     # host=dest_config.endpoint
+                                # )
+                                # if req and req.status_code == 200:
+                                #     yield f"✅ Password created successfully: {_display_name}"
+                                #     if 'keyCredentials' not in new_app:
+                                #         new_app['keyCredentials'] = []
+                                #     new_app['keyCredentials'].append(req.json())
+                                # else:
+                                #     yield f"❌ Failed to create KeyCredential: {_display_name}: " + str(req.text)
+                                #     _failed = True
+                        
+                    except Exception as e:
+                        log.error(f"Failed to update keyCredentials: {e}")
+                        raise Exception(f"Failed to update keyCredentials: {e}")
+                    
                 
                 ####### identifierUris
                 
@@ -463,11 +507,14 @@ async def post_process_migration_job(job: MigrationJob):
                         
                         for uri in identifierUris:
                             # Get format: https://learn.microsoft.com/en-us/entra/identity-platform/security-best-practices-for-app-registration#application-id-uri 
-                            # # TODO May received tenant related URI's. May need to replace with new app/tenant ids.    
-                            _new_uri = None
-                            if uri == "api://" + old_app.appId:
-                                _new_uri = "api://" + new_app['appId'] 
+                            _new_uri = uri if uri and uri != "" else None
                             
+                            if job.migration_options.swap_ids_for_new_ids:  
+                                # TODO Replace Tenant and App ID's with new Tenant and App ID's
+                                # # TODO May received tenant related URI's. May need to replace with new app/tenant ids.  
+                                if uri == "api://" + old_app.appId:
+                                    _new_uri = "api://" + new_app['appId'] 
+                                
                             if _new_uri and _new_uri not in _existing_uris: #if _new_uri not in new_app.get('identifierUris', []):
                                 _update_uris.append(_new_uri)
                         
@@ -522,14 +569,14 @@ async def post_process_migration_job(job: MigrationJob):
                         for uri in servicePrincipalNames:
                             # Get format: https://learn.microsoft.com/en-us/entra/identity-platform/security-best-practices-for-app-registration#application-id-uri 
                             # # TODO May received tenant related URI's. May need to replace with new app/tenant ids.    
-                            _new_uri = None
-                            if uri == "api://" + old_app.appId:
-                                _new_uri = "api://" + new_app['appId'] 
+                            _new_uri = uri if uri and uri != "" else None
+                            
+                            # Replace ID's Option?
+                            # if uri == "api://" + old_app.appId:
+                            #     _new_uri = "api://" + new_app['appId'] 
                             
                             if _new_uri and _new_uri not in _existing_uris: #if _new_uri not in new_app.get('servicePrincipalNames', []):
                                 _update_uris.append(_new_uri)
-                        
-                        print(_update_uris)
                         
                         if _update_uris:
                             req = server_request(
@@ -633,6 +680,10 @@ async def process_migration_job(job: MigrationJob):
         - Values of identifierUris hostnames must be a verified domain on the tenant. Create list of filters templates to skip certain app typs (eg. VPN, etc.)
         - API Permissions are not granted by default, need to look for a way to grant permissions.
         - ISSUE: Property displayName on the service principal does not match the application object
+        - Need to update notificationEmailAddresses - 
+        - keyCredentials: Requires certificate already created.
+        - TODO Option to import app from JSON file or text
+        
     """
     yield f"Processing Migration Job: {job.name}"
     

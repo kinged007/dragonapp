@@ -155,6 +155,10 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
                 
             # ui.notify("Migration Job Executed", type='positive')
             # Job is saved in  the execution method
+            _log("Migration Job Execution Completed.")
+            migrating_in_progress.update(value=False)
+            
+            
             
         except Exception as e:
             _log(f"Error: {e}")

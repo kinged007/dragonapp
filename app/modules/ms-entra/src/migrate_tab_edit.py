@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, json
 from core.utils.frontend import ui_helper, ui, FormBuilder
 from core.utils.database import Database
 from core import log, print
@@ -24,6 +24,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
         review = ui.tab('Review')
         options = ui.tab('Options')
         search = ui.tab('Search')
+        json_paste = ui.tab('JSON')
 
 
     if migration_job.status == Status.APPROVED or migration_job.status == Status.COMPLETED:
@@ -257,6 +258,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                             _ids = [r.get('id') for r in table_of_results.selected]
                             _json_editor_results.run_editor_method('updateProps', {'content': {'json': [l for l in list_of_apps if l.get('id') in _ids]}}, timeout=10)
                             # _json_editor_results.update() # BUG with this, output is table_of_results.selected (strings) -1, without it, output is empty the first time, then second time is list_of_apps (dicts) +1
+                            # _json_editor_results.set({'content': {'json': [l for l in list_of_apps if l.get('id') in _ids]}}) 
                             stepper.next()
                             # stepper.previous()
                             # stepper.next()
@@ -453,3 +455,36 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                             ui.button('Save', on_click= _confirm_submit_json_data ).classes("bg-positive text-white")
                             ui.button('Back', on_click=stepper.previous).props('flat')
 
+        with ui.tab_panel(json_paste).props('q-pa-none'):
+            
+            ui_helper.alert_info("Paste JSON data of applications that you want to migrate. The JSON string MUST be collected using Microsoft Graph API.")
+            
+            async def _save_pasted_json():
+                # json_pasted_data.run_editor_method('updateProps', {'mode': 'tree'})
+                data = await json_pasted_data.run_editor_method('get')
+                _d = data.get('json', []) if 'json' in data else data.get('text', "") if 'text' in data else []
+                if not _d:
+                    ui.notify("No data found!")
+                    return
+                if isinstance(_d, str):
+                    try:
+                        _dd = json.loads(_d)
+                        if isinstance(_dd, list):
+                            _d = _dd
+                        elif isinstance(_dd, dict):
+                            _d = [_dd]
+                        else:
+                            raise Exception("Invalid JSON data!")
+                    except:
+                        ui.notify("Invalid JSON data!")
+                        return
+                    
+                print(_d)
+                ui.notify(_d)
+            
+            json_pasted_data = ui.json_editor({'content': {'json': []} }) #, "mode":'text'} )
+            # json_pasted_data.run_editor_method('updateProps', {'text': True})
+            
+            ui.button('Save', on_click= _save_pasted_json ).classes("bg-positive text-white")
+            
+            pass

@@ -236,6 +236,10 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                                 
                                     if req and req.status_code == 204:
                                         ui.notify(f"✅ Deleted {type}:{app_id} from {dest_tenant.name}")
+                                        if type=='applications':
+                                            del migration_job.app_id_mapping[k][dest_tenant.client_id]
+                                        else:
+                                            del migration_job.sp_id_mapping[k][dest_tenant.client_id]
                                     else:
                                         log.error(req.text)
                                         ui.notify(f"❌ Failed to delete {type}:{app_id} from {dest_tenant.name}: {req.text}", type='negative')
@@ -244,6 +248,9 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                                     log.error(e)
                                     ui.notify(f"Failed to delete {type} from {dest_tenant.name}", type='negative')
                                 # msapp.delete_apps(dest_tenant, migration_job.apps)
+                    
+                    # Update the migration job
+                    update_migration_job(migration_job.id, migration_job.model_dump())
                 
                 ui.label("Apps Migrated")
                 ui.json_editor({'content':{'json': migration_job.app_id_mapping}})
