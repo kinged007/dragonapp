@@ -950,13 +950,21 @@ async def process_migration_job(job: MigrationJob):
 
     
     
-async def process_service_principal_migration(job: MigrationJob, source_tenant: Tenant):
+async def process_service_principal_migration(job: MigrationJob, source_tenant: Tenant = None):
     """
     Processing of Service Principals.
     1. Go through the apps that have been migrated, and search for corresponding Service Princicpals.
     2. Replace AppIds with the new AppIds.
     3. Migrate Service Principals to destination tenants.
     """
+    if job.service_principals:
+        yield "Service Principals already fetched!"
+        job.status = Status.COMPLETED
+        return
+    if not source_tenant:
+        yield "❌ No source tenant provided!"
+        job.status = Status.FAILED
+        return
     
     yield "Searching for Service Principals related to migrated Apps"
     

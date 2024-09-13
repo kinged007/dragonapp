@@ -6,8 +6,9 @@ from ..schema import Tenant, Status, MigrationJob, MigrationOptions
 from ..src import utils, msapp
 from ..schema import Tenant, MigrationJob, Status, SearchTemplates, MigrationOptions
 from ..src.migration import update_migration_job
-
-
+from ..schema import Tenant, MigrationJob, Status, AppsType
+from ..models.applications import ApplicationModel, passwordCredentialResource, keyCredentialResource
+from ..models.service_principals import ServicePrincipalModel
 
 
 
@@ -459,31 +460,106 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
             
             ui_helper.alert_info("Paste JSON data of applications that you want to migrate. The JSON string MUST be collected using Microsoft Graph API.")
             
+                
+                
+                
             async def _save_pasted_json():
-                # json_pasted_data.run_editor_method('updateProps', {'mode': 'tree'})
-                data = await json_pasted_data.run_editor_method('get')
-                _d = data.get('json', []) if 'json' in data else data.get('text', "") if 'text' in data else []
-                if not _d:
-                    ui.notify("No data found!")
-                    return
-                if isinstance(_d, str):
+
+                async def _update_migration_job_app_paste():
+                    if _d:
+                        migration_job.apps_type = AppsType.applications
+                        migration_job.apps = _d
+                    if _d2:
+                        migration_job.service_principals = _d2
+                    if _d and not _d2:
+                        migration_job.apps_type = AppsType.servicePrincipals
+                    migration_job.status = Status.PENDING_APPROVAL
+                    migration_job.migration_options = MigrationOptions(**form_migration_options.current_values)
+
+                    # Update
                     try:
-                        _dd = json.loads(_d)
-                        if isinstance(_dd, list):
-                            _d = _dd
-                        elif isinstance(_dd, dict):
-                            _d = [_dd]
-                        else:
-                            raise Exception("Invalid JSON data!")
-                    except:
-                        ui.notify("Invalid JSON data!")
-                        return
+                        await update_migration_job(migration_job.id, migration_job.model_dump())
+                        ui.notify("Migration Job Updated!", type='positive')
+                        print("SAVE MIGRATION JOB GOOD", migration_job)
+                        dialog_save_json.close()
+                        
+                        ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=approve")
+                        
+                    except Exception as e:
+                        log.error(e)
+                        ui.notify(f"Failed to update Migration Job: {e}", type='negative')
+                        print("SAVE MIGRATION JOB FAIL", migration_job)
+                        dialog_save_json.close()
+
+
+                # json_pasted_apps.run_editor_method('updateProps', {'mode': 'tree'})
+                data = await json_pasted_apps.run_editor_method('get')
+                _d = data.get('json', []) if 'json' in data else data.get('text', "") if 'text' in data else []
+                # if not _d:
+                #     ui.notify("No data found!")
+                #     return
+                data = await json_pasted_sp.run_editor_method('get') # optional
+                _d2 = data.get('json', []) if 'json' in data else data.get('text', "") if 'text' in data else []
+                # if not _d2:
+                #     ui.notify("No data found!")
+                #     return
+                
+                try:
                     
-                print(_d)
-                ui.notify(_d)
+                    if isinstance(_d, str):
+                        _d = json.loads(_d)
+                    if isinstance(_d, list):
+                        _d = _d
+                    elif isinstance(_d, dict):
+                        _d = [_d]
+                    else:
+                        raise Exception("Invalid JSON App data!")
+                    # _data1 = ApplicationModel(**_d[0])
+                    # if not _data1.displayName or not _data1.appId:
+                    #     raise Exception("appId and displayName are required fields! Please check the JSON data.")
+
+                    if _d2 and isinstance(_d2, str):
+                        _d2 = json.loads(_d2)
+                    if isinstance(_d2, list):
+                        _d2 = _d2
+                    elif isinstance(_d2, dict):
+                        _d2 = [_d2]
+                    else:
+                        raise Exception("Invalid JSON Service Principal data!")
+                        
+                        # _data2 = ServicePrincipalModel(**_d2[0])
+
+                        # if not _data2.displayName or not _data2.appId:
+                        #     raise Exception("appId and displayName are required fields! Please check the JSON data.")
+
+                    
+                    ## Save
+                    with ui.dialog() as dialog_save_json, ui.card():
+                        ui.label('Are you sure you want to use this pasted JSON instead?')
+                        ui_helper.alert_warning(f"This will overwrite any previously saved app metadata.")
+                            
+                        with ui.row():
+                            ui.button('Confirm',icon="check", on_click=_update_migration_job_app_paste ).props('positive').classes('bg-positive text-white')
+                            ui.button('Cancel', on_click=dialog_save_json.close).props("primary")
+                    
+                    dialog_save_json.open()
+                    
+                except Exception as e:
+                    ui.notify(e)
+                    return
+                    
+                print(type(_d))
+                # ui.notify(_d)
             
-            json_pasted_data = ui.json_editor({'content': {'json': []} }) #, "mode":'text'} )
-            # json_pasted_data.run_editor_method('updateProps', {'text': True})
+            ui.label("Paste JSON Data for App Registrations").classes('font-bold text-lg')
+            
+            json_pasted_apps = ui.json_editor({'content': {'json': []} }) #, "mode":'text'} )
+            # json_pasted_apps.run_editor_method('updateProps', {'text': True})
+            
+            ui.label("Paste JSON Data for Service Principals").classes('font-bold text-lg')
+            ui.label("Service Principals should be related to the App Registrations.")
+            
+            json_pasted_sp = ui.json_editor({'content': {'json': []} }) #, "mode":'text'} )
             
             ui.button('Save', on_click= _save_pasted_json ).classes("bg-positive text-white")
             
