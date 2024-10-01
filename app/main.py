@@ -10,12 +10,12 @@ settings.APP_VERSION = "0.0.7" # not being used yet. Causes circular dependency 
 # messaging core module handles push notifications, sms, email and IM messages (telegram, whatsapp,...). If app tries to send a message, an error will get logged
 # ai core module includes computer vision, NLP and audio processing.
 # locale core module offers translation capabilities. IF locale module is disabled, all strings will resort to their default values - ie. app base language is used.
-Module.load_core(['admin_panel']) # ,'frontend','ai','messaging','locale'])
+Module.load_core([]) # ,'frontend','ai','messaging','locale'])
 
 # Register modules with the app, so it will import it.
 # Module.load(['ms-entra'])
 # Module.load(['bookshelf','ms-entra','pollygene'])
-Module.load(['ms-entra'])
+Module.load(['ms_entra','ms_entra_ui'])
 # Module.load()
 # Modules.load('something_else') 
 

@@ -64,5 +64,5 @@ Module.register(
     ],    
 )
 
-AdminPanel.include_router(ms_entra_migrate_edit, prefix='/ms-entra/migrate-job', tags=["MS Entra"], dependencies=None)
-# AdminPanel.include_router(ms_entra_migrate_exec, prefix='/ms-entra/migrate-job', tags=["MS Entra"], dependencies=None)
+AdminPanel.include_router(ms_entra_migrate_edit, prefix='/ms_entra/migrate-job', tags=["MS Entra"], dependencies=None)
+# AdminPanel.include_router(ms_entra_migrate_exec, prefix='/ms_entra/migrate-job', tags=["MS Entra"], dependencies=None)

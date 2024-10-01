@@ -21,10 +21,13 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
     #     - Review
     #     - Options
 
+    source_tenant_name = source_tenant.name if source_tenant else "No Tenant Selected"
+
     with ui.tabs().classes() as tabs:
         review = ui.tab('Review')
         options = ui.tab('Options')
-        search = ui.tab('Search')
+        if source_tenant:
+            search = ui.tab('Search')
         json_paste = ui.tab('JSON')
 
 
@@ -45,7 +48,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
             ui.label(f"Migration Job: {migration_job.name}")
             ui.label(f"Status: {migration_job.status}") # TODO Allow to change status if user is Admin or Owner, in which case they may be able to modify it!
             ui.label(f"Stage: {migration_job.stage.capitalize()}")
-            ui.label(f"Source Tenant: {source_tenant.name}")
+            ui.label(f"Source Tenant: {source_tenant_name}")
             ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job.destination_tenants])}")
             ui.label("Migration Options")
             ui.json_editor({'content':{'json': migration_job.migration_options.model_dump()}})
@@ -78,7 +81,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                         print("SAVE MIGRATION JOB GOOD", migration_job)
                         dialog.close()
                         
-                        # ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=approve")
+                        # ui.navigate.to(f"/ms_entra/migrate-job/{migration_job.id}?tab=approve")
                         
                     except Exception as e:
                         log.error(e)
@@ -267,8 +270,8 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
 
                         app_type = migration_job.apps_type
                                                 
-                        # ui.label(f"Searching '{app_type}' from Tenant '{source_tenant.name}'").classes('font-bold text-lg')
-                        ui.label(f"Search for Apps on Tenant '{source_tenant.name}'").classes('font-bold text-lg')
+                        # ui.label(f"Searching '{app_type}' from Tenant '{source_tenant_name}'").classes('font-bold text-lg')
+                        ui.label(f"Search for Apps on Tenant '{source_tenant_name}'").classes('font-bold text-lg')
                         
                         # Fetch search templates
                         fetch_search_templates(app_type)
@@ -413,7 +416,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                                     print("SAVE MIGRATION JOB GOOD", migration_job)
                                     dialog.close()
                                     
-                                    ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=approve")
+                                    ui.navigate.to(f"/ms_entra/migrate-job/{migration_job.id}?tab=approve")
                                     
                                 except Exception as e:
                                     log.error(e)
@@ -483,7 +486,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                         print("SAVE MIGRATION JOB GOOD", migration_job)
                         dialog_save_json.close()
                         
-                        ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=approve")
+                        ui.navigate.to(f"/ms_entra/migrate-job/{migration_job.id}?tab=approve")
                         
                     except Exception as e:
                         log.error(e)

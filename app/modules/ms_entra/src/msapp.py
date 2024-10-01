@@ -677,7 +677,7 @@ async def process_migration_job(job: MigrationJob):
         - Using POST / PATCH to set passwordCredential is not supported. Use the addPassword and removePassword methods to update the password or secret for an application.
         - keyCredential - create/generate and apply certificates separately.https://learn.microsoft.com/en-us/graph/applications-how-to-add-certificate?tabs=http
         - to refer to the app by the appId, use /applications(appId='{appId}')
-        - Values of identifierUris hostnames must be a verified domain on the tenant. Create list of filters templates to skip certain app typs (eg. VPN, etc.)
+        - *** Values of identifierUris hostnames must be a verified domain on the tenant. Create list of filters templates to skip certain app typs (eg. VPN, etc.)
         - API Permissions are not granted by default, need to look for a way to grant permissions.
         - ISSUE: Property displayName on the service principal does not match the application object
         - Need to update notificationEmailAddresses - 
@@ -1007,5 +1007,47 @@ async def process_service_principal_migration(job: MigrationJob, source_tenant: 
     
     job.status = Status.COMPLETED
     
+    
+    
+    
+async def fetch_sp_from_apps(app_ids: list, source_tenant: Tenant):
+    """
+    Processing of Service Principals.
+    1. Go through the apps that have been migrated, and search for corresponding Service Princicpals.
+    2. Replace AppIds with the new AppIds.
+    3. Migrate Service Principals to destination tenants.
+    """
+    
+    # Prepare tenant object
+    if not source_tenant.access_token:
+        source_tenant = connect_tenant(source_tenant.model_dump())
+    
+    if not source_tenant or not source_tenant.access_token:
+        return False
+    
+    if not app_ids: 
+        return False
+    
+    app_ids = [f"'{i}'" for i in app_ids]
+        
+    try:
+        # list_of_apps = msapp.fetch_listing(migration_job.apps_type, endpoint=f"/{migration_job.apps_type}", tenant=tenant, query={
+        _q = {
+            # "search": _search.value, 
+            "filter": f"appId in [{','.join(app_ids)}]", 
+            # "raw_params": _raw.value, 
+            # "skip_publishers": _skip_publishers.value if _skip_publishers and _app_type.value == 'servicePrincipals' else None, 
+        }
+        list_of_apps = fetch_listing('servicePrincipals', endpoint="/servicePrincipals", tenant=source_tenant, query=_q)
+    except Exception as e:
+        log.error(e)
+        return False
+
+    
+    if list_of_apps and len(list_of_apps)>0:
+        # We have SP to migrate
+        return list_of_apps
+    
+    return []
     
     

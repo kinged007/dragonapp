@@ -44,7 +44,7 @@ def sidebar_menu(self):
                 for db_title, _url_path in url.items():
                     ui.menu_item(db_title, on_click=lambda url_path=_url_path: ui.navigate.to(url_path)).classes('full-width')
         else:
-            ui.menu_item(title, on_click=lambda: ui.navigate.to(url)).classes('full-width text-light')
+            ui.menu_item(title, on_click=lambda url_path=url: ui.navigate.to(url_path)).classes('full-width text-light')
         
             
     # Trigger menu event hook

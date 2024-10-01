@@ -16,7 +16,7 @@ def edit_migration_details(item: dict, base_model: database.DatabaseMongoBaseMod
         log.warning(f"Callback 'crud_item_created' executed: {item}")
         # print(type(job), job)
         # print(job.name)
-        ui.navigate.to(f"/ms-entra/migrate-job/{job.id}")
+        ui.navigate.to(f"/ms_entra/migrate-job/{job.id}")
         # with ui.dialog() as dialog, ui.card():
         #     ui.label(f"New Migration Job Created: {job.id}")
         # dialog.open()
@@ -86,7 +86,8 @@ def crud_interface_buttons(base_model: database.DatabaseMongoBaseModel, selected
                     ui.notification("Select a single item to modify.", position='center', type='negative', icon='error', timeout=1)
                     return
                 job = MigrationJob(**item[0])   
-                ui.navigate.to(f"/ms-entra/migrate-job/{job.id}")
+                # ui.navigate.to(f"/ms_entra/migrate-job/{job.id}")
+                ui.navigate.to(f"/ticket/view/{job.id}")
                 
         def _click_exec():
             if selected_items:
@@ -100,7 +101,8 @@ def crud_interface_buttons(base_model: database.DatabaseMongoBaseModel, selected
                     ui.notification("Job must be in 'APPROVED' status to execute.", position='center', type='negative', icon='error', timeout=1)
                     return
                 
-                ui.navigate.to(f"/ms-entra/migrate-job/{job.id}?tab=execute")
+                ui.navigate.to(f"/ms_entra/migrate-job/{job.id}?tab=execute")
 
-        ui.button("Edit Job Details", on_click=_click_edit)
-        ui.button("Execute Job", on_click=_click_exec)
+        # ui.button("Edit Job Details", on_click=_click_edit)
+        # ui.button("Execute Job", on_click=_click_exec)
+        ui.button("View Job", on_click=_click_edit)

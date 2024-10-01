@@ -260,17 +260,21 @@ Module.load_routes(app)
 # NOTE - NiceGUI MUST be loaded before lifespan. Websockets dont work correctly if loaded after lifespan.
 # ... Therefore, will have to use a different method to connect to the DB to retrieve configurations.
 
-# If using AdminPanel
-if 'admin_panel' in Module.loaded_modules:
-    pass
+# If using AdminPanel - DEPRECATE - using else statement below.
+# if 'admin_panel' in Module.loaded_modules:
+#     pass
 #     from core.admin import router as admin_router
 #     app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 # If using Frontend
 if 'frontend' in Module.loaded_modules:
-    pass
 #     from core.frontend import router as frontend_router
 #     app.include_router(frontend_router, prefix="/", tags=["frontend"])
+    # @app.get("/", include_in_schema=False, response_class=HTMLResponse)
+    # async def frontend():
+    #     pass
+    pass
+
 else:
     # Main page - If NOT using AdminPanel or Frontend
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
@@ -281,7 +285,7 @@ else:
         _text += "<p>"+settings.PROJECT_DESCRIPTION+"</p>"
         
         if 'admin_panel' in Module.loaded_modules:
-            _text += f"<p><a href='/admin'>Admin</a> | "
+            _text += f"<p><a href='{settings.ADMIN_PANEL_STR}'>Admin</a> | "
         
         _text += f"<a href='/docs'>Swagger Docs</a> | <a href='/redoc'>ReDoc Docs</a>"
         

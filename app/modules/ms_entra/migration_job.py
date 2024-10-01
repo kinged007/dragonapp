@@ -91,14 +91,14 @@ def migration_job_edit(id:str, tab:str = 'overview'):
     log.debug(str(migration_job)[:500] + "...")
     
     # fallback  # TODO Should be a dict, not a list!!
-    if isinstance(migration_job.source_tenant, list):
+    if migration_job.source_tenant and isinstance(migration_job.source_tenant, list):
         log.error("Source Tenant is a list! Should be a dict")
         # migration_job.source_tenant = migration_job.source_tenant[0]
         source_tenant = migration_job.source_tenant[0]
     else:
         source_tenant = migration_job.source_tenant
 
-    # source_tenant = migration_job.source_tenant.name
+    source_tenant_name = source_tenant.name if source_tenant else "No Tenant Selected"
     
     # Pagination
 
@@ -117,7 +117,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                 ui.notify("Migration Job Approved!", type='positive')
                 await asyncio.sleep(1)
                 dialog2.close()
-                ui.navigate.to(f"/ms-entra/migrate-job/{migration_job.id}?tab=execute")
+                ui.navigate.to(f"/ms_entra/migrate-job/{migration_job.id}?tab=execute")
             except Exception as e:
                 log.error(e)
                 ui.notify(f"Failed to approve Migration Job: {e}", type='negative')
@@ -146,7 +146,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                 ui.label(f"Job Name: {migration_job.name}")
                 ui.label(f"Status: {migration_job.status}")
                 ui.label(f"Stage: {migration_job.stage.capitalize()}")
-                ui.label(f"Source Tenant: {source_tenant.name}")
+                ui.label(f"Source Tenant: {source_tenant_name}")
                 ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job.destination_tenants])}")
                 ui.label("Migration Options")
                 ui.json_editor({'content':{'json': migration_job.migration_options.model_dump()}})
@@ -172,7 +172,7 @@ def migration_job_edit(id:str, tab:str = 'overview'):
                 # 1. Check status is correct
                 if migration_job.status != Status.PENDING_APPROVAL:
                     ui_helper.alert_error(f"Migration Job is not in PENDING_APPROVAL status. Current status: {migration_job.status}")
-                ui.label(f"Source Tenant: {source_tenant.name}")
+                ui.label(f"Source Tenant: {source_tenant_name}")
                 ui.label(f"Destination Tenants: {', '.join([t.name for t in migration_job.destination_tenants])}")
                 ui.label("Migration Options")
                 ui.json_editor({'content':{'json': migration_job.migration_options.model_dump()}})

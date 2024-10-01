@@ -104,7 +104,8 @@ class MigrationOptions(BaseModel):
 class MigrationJob(database.DatabaseMongoBaseModel):
     
     
-    name: str = Field(..., description="The name of the migration job")
+    name: str = Field("change me", description="The name of the migration job")
+    approved: bool = Field(False, description="The approval status of the migration job")
     status: Status = Field(Status.PENDING, description="The status of the migration job")
     apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
     stage: Literal['pending','apps','post_apps','service_principals_from_apps', 'service_principals','post_service_principals','completed'] = Field('pending', description="The stage of the migration job")

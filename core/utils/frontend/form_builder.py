@@ -402,23 +402,29 @@ class FormBuilder:
             except Exception as e:
                 ui.notification('Error: '+str(e), position='bottom', type='negative', icon='error', timeout=30, close_button=True)
     
-    def build(self):
+    def build(self, callback:callable = None):
         # Catch form submission
         
         # print("SCHEMA", self.schema )
         # print("CURRENT VALUES", self.current_values )
         # Start form
-        self.build_main_form()
+        self.build_main_form(callback=callback)
             
         # End form
         # Submit button
         self.submit_button()
     
-    def build_main_form(self, skip_keys:List[str] = ['id','_id']):
+    def build_main_form(self, skip_keys:List[str] = ['id','_id'], callback:callable = None):
         with self.ui_container(**self.ui_container_kwargs) as self.form_container:
             for key, property in self.schema['properties'].items():
                 if key.startswith('_') or key in skip_keys: continue
-                self.create_form_element(key, property)
+                try:
+                    key, property = callback(key, property) if callback else (key, property)
+                except Exception as e:
+                    log.error(e)
+                
+                if key and property:
+                    self.create_form_element(key, property)
     
     def submit_button(self, value:str = None, classes="bg-positive text-white") -> ui.button:
         _v = value if value else self.submit_value

@@ -217,7 +217,7 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
             execute_button = ui.button("Execute Migration", on_click=_process_migration ).classes("bg-positive text-white")
             ui.button("Execute Post-Processing Migration" )
             ui.button("View Report" )
-            # ui.button("Cancel Migration", on_click=lambda: ui.navigate.to(f"ms-entra/migrate-job/{migration_job.id}?tab=report") ).bind_visibility_from(locals(),'migrating_in_progress')
+            # ui.button("Cancel Migration", on_click=lambda: ui.navigate.to(f"ms_entra/migrate-job/{migration_job.id}?tab=report") ).bind_visibility_from(locals(),'migrating_in_progress')
             _cancel_button = ui.button("Cancel Migration", on_click=lambda: migrating_in_progress.update(value=False) ).classes("bg-negative text-white").bind_visibility_from(migrating_in_progress, 'value')
         
         ui.label("Migration Execution Log")
