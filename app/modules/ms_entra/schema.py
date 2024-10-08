@@ -98,24 +98,21 @@ class MigrationOptions(BaseModel):
     swap_ids_for_new_ids: bool = Field(False, description="Swap the app ids for the new app ids")
     # create group and assign to app (app/SP?)
     
-    
-    
-            
+                
 class MigrationJob(database.DatabaseMongoBaseModel):
     
     
     name: str = Field("change me", description="The name of the migration job")
     approved: bool = Field(False, description="The approval status of the migration job")
     status: Status = Field(Status.PENDING, description="The status of the migration job")
-    apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
-    stage: Literal['pending','apps','post_apps','service_principals_from_apps', 'service_principals','post_service_principals','completed'] = Field('pending', description="The stage of the migration job")
-    search_params: Optional[Dict] = Field({}, description="The search parameters for the apps to be migrated", json_schema_extra={"hidden": True})
+    
+    approved_by: Optional[str] = Field(None, description="The user who approved the migration job")
+    approved_at: Optional[str] = Field(None, description="The time the migration job was approved")
     
     apps: List[Dict] = Field([], description="The apps to be migrated", json_schema_extra={"hidden": True}) 
     service_principals: List[Dict] = Field([], description="The service principals to be migrated", json_schema_extra={"hidden": True}) 
     
     # file: Optional[str] = None
-    source_tenant: Optional[List[Tenant]] = Field(None, description="The source tenant file name")
     # source_client_id: Optional[str] = Field(default=None, description="The source tenant client id")
     destination_tenants: List[Tenant] = Field([], description="The destination tenant file names")
     migration_options: Optional[MigrationOptions] = Field(MigrationOptions(), description="The migration options")
@@ -126,7 +123,13 @@ class MigrationJob(database.DatabaseMongoBaseModel):
     apps_failed: Optional[Dict[str, Dict[str,dict]]] = Field({}, description="The list of apps that failed to migrate: {destination_client_id: {'app': _data, 'response': req.text, 'status': req.status_code }}", json_schema_extra={"hidden": True})
     sp_failed: Optional[Dict[str, Dict[str,dict]]] = Field({}, description="The list of apps that failed to migrate: {destination_client_id: {'app': _data, 'response': req.text, 'status': req.status_code }}", json_schema_extra={"hidden": True})
     
+    
+    ## DEPRECATE
     log: Optional[List[str]] = Field([], description="The log of the migration job")
+    apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
+    search_params: Optional[Dict] = Field({}, description="The search parameters for the apps to be migrated", json_schema_extra={"hidden": True})
+    stage: Literal['pending','apps','post_apps','service_principals_from_apps', 'service_principals','post_service_principals','completed'] = Field('pending', description="The stage of the migration job")
+    source_tenant: Optional[List[Tenant]] = Field(None, description="The source tenant file name")
     
     class Settings:
         name = "ms_entra_migration_job"
@@ -208,6 +211,18 @@ class MigrationJob(database.DatabaseMongoBaseModel):
                 output[_key]["destination::"] = "No AppId Match. App not migrated."
                 
         return output
+
+
+class MigrationLog(database.DatabaseMongoBaseModel):
+    
+    description: str = Field(..., description="The description of the log")
+    migration_job: Optional[MigrationJob] = Field(None, description="The migration job")
+    data: Optional[Dict] = Field({}, description="The data of the log")
+    
+    class Settings:
+        name = "ms_entra_migration_log"
+        title = "Entra Migration Log"
+
 
 # Define the database tables
 class SearchTemplates(database.DatabaseMongoBaseModel):

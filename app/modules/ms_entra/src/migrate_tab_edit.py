@@ -474,7 +474,7 @@ def migrate_tab_edit(migration_job: MigrationJob, source_tenant: Tenant):
                         migration_job.apps = _d
                     if _d2:
                         migration_job.service_principals = _d2
-                    if _d and not _d2:
+                    if _d2 and not _d:
                         migration_job.apps_type = AppsType.servicePrincipals
                     migration_job.status = Status.PENDING_APPROVAL
                     migration_job.migration_options = MigrationOptions(**form_migration_options.current_values)
