@@ -68,6 +68,6 @@ async def db_page(ticket:str, view:str="list"):
         schema = migration_job.model_json_schema()
         with Theme.content("Overview"):
             
-            ui.json_editor({ 'content' : {'json': migration_job.model_dump() }})
-            
             FormBuilder(schema, migration_job.model_dump(mode="json"), save_ticket ).build(form_builder)
+
+            ui.json_editor({ 'content' : {'json': migration_job.model_dump() }})

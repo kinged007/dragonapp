@@ -397,14 +397,16 @@ async def post_process_migration_job(job: MigrationJob):
                 try:
                     if hasattr(old_app, 'passwordCredentials'): 
                         # Create new passwordCredentials
+                        # Create new passwords always!!!
                         if old_app.passwordCredentials:
-                            _passwords = [x for x in old_app.passwordCredentials if not x.endDateTime or parse(x.endDateTime) > today]
+                            _passwords = [x for x in old_app.passwordCredentials]
+                            # _passwords = [x for x in old_app.passwordCredentials if not x.endDateTime or parse(x.endDateTime) > today]
                             if not _passwords and job.migration_options.generate_new_password_if_all_expired:
                                 # Generate new password
-                                _passwords = [passwordCredentialResource(displayName="New Password")]  #old_app.passwordCredentials[0] 
+                                _passwords = [passwordCredentialResource(displayName="New Migration Password")]  #old_app.passwordCredentials[0] 
                             for password in _passwords:
                                 # Create password
-                                _display_name = password.displayName if password.displayName else "New Migration Password"
+                                _display_name = password.displayName if password.displayName else "Migration Password"
                                 # Check if password exists or created already
                                 if any([x for x in new_app.get('passwordCredentials',[]) if x.get('displayName') == _display_name]):
                                     yield f"Password '{_display_name}' already exists..."
