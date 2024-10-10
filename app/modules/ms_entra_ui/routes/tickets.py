@@ -2,6 +2,7 @@ from nicegui import ui, APIRouter, app
 import json
 
 from core.utils.string import to_snake_case
+from core.utils.datetime import nice_time
 from core import Module, log
 from core.schemas.database import DatabaseMongoBaseModel
 
@@ -14,7 +15,7 @@ from core.utils.frontend.form_builder import FormBuilder
 from core.utils.database import Database, ObjectId
 from app.modules.ms_entra.src import utils, msapp
 from app.modules.ms_entra.models import applications, service_principals
-from app.modules.ms_entra.schema import Tenant, MigrationJob
+from app.modules.ms_entra.schema import Tenant, MigrationJob, Status
 
 router = APIRouter()
 
@@ -74,8 +75,10 @@ async def db_page(ticket:str, view:str="list"):
                 # list = ui.tab('List')
                 overview = ui.tab('Overview')
                 edit = ui.tab('Edit')
-                approve = ui.tab('Approve')
                 apps = ui.tab('Apps')
+                approve = ui.tab('Approve')
+                execute = ui.tab('Execute')
+                logs = ui.tab('Logs')
 
             with ui.tab_panels(tabs, value=overview).props('q-pa-none').classes('full-width').style("background: none;"):
 
@@ -112,12 +115,12 @@ async def db_page(ticket:str, view:str="list"):
                         # Validate JSON
                         try:
                             d = []
-                            if _dd:
-                                _dd = _validate_input(_dd)
-                                for d in _dd:
-                                    d = applications.ApplicationModel(**d)
-                                # _dd = applications.ApplicationModel(**_dd)
-                                migration_job.apps = _dd
+                            # if _dd:
+                            _dd = _validate_input(_dd)
+                            for d in _dd:
+                                d = applications.ApplicationModel(**d)
+                            # _dd = applications.ApplicationModel(**_dd)
+                            migration_job.apps = _dd
                         except Exception as e:
                             ui.notify(str(e))
                             return False
@@ -128,12 +131,12 @@ async def db_page(ticket:str, view:str="list"):
                         # Validate JSON
                         try:
                             d = []
-                            if _dd:
-                                _dd = _validate_input(_dd)
-                                for d in _dd:
-                                    d = service_principals.ServicePrincipalModel(**d)
-                                    # _dd = service_principals.ServicePrincipalModel(**_dd)
-                                migration_job.service_principals = _dd
+                            # if _dd:
+                            _dd = _validate_input(_dd)
+                            for d in _dd:
+                                d = service_principals.ServicePrincipalModel(**d)
+                                # _dd = service_principals.ServicePrincipalModel(**_dd)
+                            migration_job.service_principals = _dd
                         except Exception as e:
                             ui.notify(str(e))
                             return False
@@ -148,6 +151,7 @@ async def db_page(ticket:str, view:str="list"):
                             return False
                         db_client.update_one({'_id': ObjectId(ticket)}, migration_job.model_dump())
                         ui.notify("Saved")
+                        ui.navigate.reload()
                     
                     ui.label('Applications')
                     app_json = ui.json_editor({ 'content' : {'json': migration_job.apps }})
@@ -155,4 +159,44 @@ async def db_page(ticket:str, view:str="list"):
                     sp_json = ui.json_editor({ 'content' : {'json': migration_job.service_principals }})
                     ui.button('Validate').on_click(validate_data)
                     ui.button('Save').on_click(update_json)
-                                    
+
+
+                with ui.tab_panel(approve):
+                    
+                    async def update_status(status:str):
+                        
+                        if status == 'approve':
+                            migration_job.status = Status.IN_PROGRESS
+                            migration_job.approved = True
+                            migration_job.approved_by = "admin"
+                            migration_job.approved_at = nice_time()
+                        elif status == 'reject':
+                            migration_job.status = Status.REJECTED
+                            migration_job.approved = False
+                            migration_job.approved_by = "admin"
+                            migration_job.approved_at = nice_time() # UTC time
+                            
+                        db_client.update_one({'_id': ObjectId(ticket)}, migration_job.model_dump())
+                        ui.notify("Saved")
+                        ui.navigate.reload()
+                        
+                    ui.label('Approve Ticket')
+                    with ui.row():
+                        ui.button('Approve').on_click(lambda: update_status("approve")).classes("bg-positive text-white")
+                        ui.button('Reject').on_click(lambda: update_status("reject")).classes("bg-negative text-white")
+
+
+                with ui.tab_panel(execute):
+                        
+                        async def execute_job():
+                            migration_job.status = Status.IN_PROGRESS
+                            db_client.update_one({'_id': ObjectId(ticket)}, migration_job.model_dump())
+                            ui.notify("Job Executed")
+                            ui.navigate.reload()
+                        
+                        ui.label('Execute Ticket')
+                        ui.button('Execute').on_click(execute_job).classes("bg-positive text-white")
+                        
+                with ui.tab_panel(logs):
+                    ui.label('Logs')
+                    # ui.textarea(migration_job.log).style('height: 300px;')
