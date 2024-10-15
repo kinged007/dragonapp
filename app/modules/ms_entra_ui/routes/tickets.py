@@ -23,12 +23,35 @@ router = APIRouter()
 def module_page( action:str = 'list'):
     Theme = get_theme()
     
-    with Theme.frame(f'Tickets: {action}'):
-        ui.label('Ticket page!')
-
-        # NOTE dark mode will be persistent for each user across tabs and server restarts
-        ui.dark_mode().bind_value(app.storage.user, 'dark_mode')
-        ui.checkbox('dark mode').bind_value(app.storage.user, 'dark_mode')
+    with Theme.frame(f'Ticket'):
+        
+        if action == 'new':
+            
+            with Theme.content("New Ticket"):
+                
+                def save_ticket(data):
+                    ui.notify("Saving Ticket")
+                    print(data)
+                    try:
+                        new_config = MigrationJob(**data)
+                        # Data validated
+                        db_client = Database.get_collection(MigrationJob.Settings.name)
+                        db_client.insert_one(new_config.model_dump())
+                        ui.navigate.to(f'/ticket/view/{new_config.id}')
+                    except Exception as e:
+                        raise Exception([str(er.get('loc')) + ": " +er.get('msg') for er in e.errors()])
+                        # print(type(e),e.errors(), e.title, e.args)
+                        raise e
+                    
+                    return True
+                
+                ui.label('New Ticket')
+                schema = MigrationJob.model_json_schema()
+                _skip = "approved,status,approved_by,approved_at,app_id_mapping,sp_id_mapping,apps_failed,sp_failed,log,search_params,stage,source_tenant".split(",")
+                schema['properties'] = {k:v for k,v in schema['properties'].items() if k not in _skip}
+                
+                FormBuilder(schema, {}, save_ticket ).build()
+                
         
 @router.page('/view/{ticket}')
 async def db_page(ticket:str, view:str="list"):
@@ -181,22 +204,43 @@ async def db_page(ticket:str, view:str="list"):
                         ui.navigate.reload()
                         
                     ui.label('Approve Ticket')
-                    with ui.row():
-                        ui.button('Approve').on_click(lambda: update_status("approve")).classes("bg-positive text-white")
-                        ui.button('Reject').on_click(lambda: update_status("reject")).classes("bg-negative text-white")
+                    
+                    _ready = True
+                    if migration_job.status not in [Status.PENDING_APPROVAL]:
+                        ui_helper.alert_error(f"Status not Pending Approval. Current status: {migration_job.status}")
+                        _ready = False
+                    
+                    if not migration_job.destination_tenants:
+                        ui_helper.alert_error(f"Destination Tenants not set.")
+                        _ready = False
+                    
+                    # 3. Check apps to migrate
+                    if not migration_job.apps:
+                        ui_helper.alert_error(f"No Apps to migrate.")
+                        _ready = False
+                    
+                    if _ready:
+                        with ui.row():
+                            ui.button('Approve').on_click(lambda: update_status("approve")).classes("bg-positive text-white")
+                            ui.button('Reject').on_click(lambda: update_status("reject")).classes("bg-negative text-white")
 
 
                 with ui.tab_panel(execute):
-                        
-                        async def execute_job():
-                            migration_job.status = Status.IN_PROGRESS
-                            db_client.update_one({'_id': ObjectId(ticket)}, migration_job.model_dump())
-                            ui.notify("Job Executed")
-                            ui.navigate.reload()
-                        
-                        ui.label('Execute Ticket')
-                        ui.button('Execute').on_click(execute_job).classes("bg-positive text-white")
+                    
+                    ### Temporary import of execution logic
+                    from app.modules.ms_entra.src.migration_tab_execute import migration_tab_execute
+                    migration_tab_execute(migration_job )
+                    
+                    # async def execute_job():
+                    #     migration_job.status = Status.IN_PROGRESS
+                    #     db_client.update_one({'_id': ObjectId(ticket)}, migration_job.model_dump())
+                    #     ui.notify("Executing Job")
+                    #     ui.navigate.reload()
+                    
+                    # ui.label('Execute Ticket')
+                    # ui.button('Execute').on_click(execute_job).classes("bg-positive text-white")
                         
                 with ui.tab_panel(logs):
                     ui.label('Logs')
                     # ui.textarea(migration_job.log).style('height: 300px;')
+                    

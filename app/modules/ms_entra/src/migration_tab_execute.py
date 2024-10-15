@@ -9,7 +9,7 @@ from ..schema import Tenant, MigrationJob, Status, SearchTemplates, MigrationOpt
 from ..src.migration import save_execution
 
 
-def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
+def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant = None):
     # Migration callback
 
     migrating_in_progress = {'value': False}
@@ -179,9 +179,10 @@ def migration_tab_execute(migration_job:MigrationJob, source_tenant: Tenant):
         _ready = False
     
     # 2. Check source_tenant exists and destination tenants exist
-    if not migration_job.source_tenant:
-        ui_helper.alert_error(f"Source Tenant not set.")
-        _ready = False
+    # DEPRECATED - not using source tennats anymore. use app explorer
+    # if not migration_job.source_tenant:
+    #     ui_helper.alert_error(f"Source Tenant not set.")
+    #     _ready = False
         
     if not migration_job.destination_tenants:
         ui_helper.alert_error(f"Destination Tenants not set.")
