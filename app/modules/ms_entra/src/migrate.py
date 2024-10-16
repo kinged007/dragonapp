@@ -85,6 +85,8 @@ async def migrate(job: MigrationJob):
 
             for i in range(len(apps)):
                 
+                ### Validate App Data
+                
                 try:
                     
                     yield f"Parsing {job.apps_type} app data for {apps[i].get('displayName','?')}"
@@ -104,7 +106,20 @@ async def migrate(job: MigrationJob):
                     continue
                 
                 source_app_data = _data.model_copy()
-        
+                
+                ### Manipulate App Data
+                # Set naming convention
+                # 
+
+            
+                ### Create App
+                # Check if app is already migrated. If yes, then Update!
+                
+                
+                ### Update Metadata
+                
+                
+                
         except Exception as e:
             yield f"❌ Failed to migrate apps: {e}"
             job.status = Status.FAILED
