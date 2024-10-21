@@ -66,8 +66,10 @@ def get_access_token(config:dict):
         result = source_app.acquire_token_for_client(scopes=config["scope"])
 
     if "access_token" in result:
+        print('Access token retrieved successfully')
         return result['access_token']
 
+    print('Failed to retrieve access token')
     return None
 
 

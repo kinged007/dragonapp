@@ -244,6 +244,8 @@ class ApplicationModel(BaseModel):
         # 'use_enum_values': True,
     }
     
+    original_ref: Optional[str] = None
+    
     addIns: Optional[List[addIn]] = None
     api: Optional[apiApplicationResource] = None
     appId: Optional[str] = None # read-only
@@ -283,7 +285,7 @@ class ApplicationModel(BaseModel):
     verifiedPublisher: Optional[verifiedPublisherResource] = None
     web: Optional[webApplicationResource] = None
     
-    def post_model(self):
+    def post_model(self, exclude:list=[]):
         # Create new app
-        return self.model_dump(exclude=['id','appId','applicationTemplateId','createdDateTime','deletedDateTime','publisherDomain','uniqueName'], exclude_unset=True, exclude_none=True)
+        return self.model_dump(exclude=['original_ref','id','displayName','appId','applicationTemplateId','createdDateTime','deletedDateTime','publisherDomain','uniqueName'] + exclude, exclude_unset=True, exclude_none=True)
 

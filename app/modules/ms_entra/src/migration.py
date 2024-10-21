@@ -34,7 +34,9 @@ async def update_migration_job(id:str, job_json:dict) -> None:
 
 
 def save_execution(job: MigrationJob):
-    
+    return update_migration_object(job)
+
+def update_migration_object(job: MigrationJob):
     db = Database.get_collection(MigrationJob.Settings.name)
     db.update_one({"_id": ObjectId(job.id)}, {"$set": job.model_dump(exclude=["source_tenant", "destination_tenants", "name","search_params", 'migration_options'])})
 

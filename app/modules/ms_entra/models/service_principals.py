@@ -148,9 +148,9 @@ class ServicePrincipalModel(BaseModel):
     
     
 
-    def post_model(self):
+    def post_model(self, exclude:list=[]):
         # Create new app
         return self.model_dump(exclude=['id','applicationTemplateId','appDisplayName','deletedDateTime',
             'resourceSpecificApplicationPermissions','signInAudience','appOwnerOrganizationId','info',
             'displayName'
-        ],exclude_unset=True,  exclude_none=True)
+        ] + exclude ,exclude_unset=True,  exclude_none=True)

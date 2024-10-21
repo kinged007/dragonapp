@@ -33,6 +33,10 @@ def server_request(endpoint, method="GET", data={}, headers={}, params={}, api_k
             res = requests.patch(endpoint, headers=headers, json=data, params=params)
         else:
             raise Exception("Invalid method")
+        
+        # TODO Catch unauthenticated errors here and raise if not authenticated
+        # Using Authorization_* code response to identify issues. Remove API permissions scopes from connected app to recieve error
+        
         return res
     
     except Exception as e:

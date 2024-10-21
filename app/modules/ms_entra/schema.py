@@ -97,9 +97,19 @@ class MigrationOptions(BaseModel):
     use_upsert: bool = Field(False, description="Use upsert to update existing apps or create new one if they don't exist")
     migrate_service_principals: bool = Field(True, description="Migrate service principals after Applications have been migrated successfully.")
     swap_ids_for_new_ids: bool = Field(False, description="Swap the app ids for the new app ids")
+    reference_attribute: Literal['appId', 'displayName'] = Field('appId', description="The attribute to use as reference for mapping source apps to destination apps")
     # create group and assign to app (app/SP?)
     
-                
+class LogModel(BaseModel):
+    """
+    Log Model
+    """
+    type: Literal['info', 'warning', 'error'] = Field('info', description="The type of log")
+    description: str
+    data: Optional[Dict] = {}
+    resolved: bool = False
+    
+
 class MigrationJob(database.DatabaseMongoBaseModel):
     
     
@@ -124,9 +134,11 @@ class MigrationJob(database.DatabaseMongoBaseModel):
     apps_failed: Optional[Dict[str, Dict[str,dict]]] = Field({}, description="The list of apps that failed to migrate: {destination_client_id: {'app': _data, 'response': req.text, 'status': req.status_code }}", json_schema_extra={"hidden": True})
     sp_failed: Optional[Dict[str, Dict[str,dict]]] = Field({}, description="The list of apps that failed to migrate: {destination_client_id: {'app': _data, 'response': req.text, 'status': req.status_code }}", json_schema_extra={"hidden": True})
     
+    error_log: Optional[List[str]] = Field([], description="The error log of the migration job")
+    logs: Optional[List[LogModel]] = Field([], description="The log of the migration job")
     
     ## DEPRECATE
-    log: Optional[List[str]] = Field([], description="The log of the migration job")
+    log: Optional[List[str]] = Field([], description="The log of the migration job") # or convert to dict with more options
     apps_type: AppsType = Field(AppsType.applications, description="The type of apps to be migrated")
     search_params: Optional[Dict] = Field({}, description="The search parameters for the apps to be migrated", json_schema_extra={"hidden": True})
     stage: Literal['pending','apps','post_apps','service_principals_from_apps', 'service_principals','post_service_principals','completed'] = Field('pending', description="The stage of the migration job")

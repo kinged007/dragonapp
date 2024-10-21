@@ -34,6 +34,23 @@ class MSEntraConfig(module_config.BaseModuleConfig):
 # Define the API router
 api_router = APIRouter()
 
+@api_router.get("/test")
+async def test(id: str):
+    from .src.migrate import migrate_execution
+    from core.utils.database import Database, ObjectId
+    db = Database.get_collection(MigrationJob.Settings.name)
+    job = db.find_one({"_id": ObjectId(id)})
+    migration_job = MigrationJob(**job)
+    # res = migrate_execution(migration_job)
+    output = []
+    # Running the migration asynchronously
+    async for res in migrate_execution(migration_job):
+        output.append(res)
+    
+    # Running the migration in the background
+    
+    return {"message": output }
+
 # Define the CRUD endpoints
 CRUDJsonEndpoints(
     api_router,

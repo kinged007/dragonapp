@@ -73,6 +73,7 @@ async def db_page(ticket:str, view:str="list"):
             # Data validated
             migration_job = new_config
             db_client.update_one({'_id': ObjectId(ticket)}, new_config.model_dump())
+            ui.navigate.reload()
             
         except Exception as e:
             raise Exception([str(er.get('loc')) + ": " +er.get('msg') for er in e.errors()])
@@ -228,8 +229,10 @@ async def db_page(ticket:str, view:str="list"):
                 with ui.tab_panel(execute):
                     
                     ### Temporary import of execution logic
-                    from app.modules.ms_entra.src.migration_tab_execute import migration_tab_execute
-                    migration_tab_execute(migration_job )
+                    # from app.modules.ms_entra.src.migration_tab_execute import migration_tab_execute
+                    from app.modules.ms_entra.src.migrate import migrate_ui
+                    # migration_tab_execute(migration_job )
+                    await migrate_ui( migration_job )
                     
                     # async def execute_job():
                     #     migration_job.status = Status.IN_PROGRESS
